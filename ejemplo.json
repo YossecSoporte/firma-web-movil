@@ -1,0 +1,25 @@
+{
+  "configuration": {
+    "signature_type": "basic",
+    "signature_reason": "Acepto el contenido del documento",
+    "generate_request": "NOMBRE EMPRESA"
+  },
+  "documents": [
+    {
+      "file": "doc_prueba1.pdf", URL DE DESCARGA,
+      "to": "URL DE SUBIDA PDF ",
+      "user_id": "USER123",
+      "doc_sha256": "a1b2c3d4e5f6... (opcional, se calcula si no viene)",
+      "settings": {
+        "vis_sig_x": 340,
+        "vis_sig_y": 693,
+        "vis_sig_width": 155,
+        "vis_sig_height": 55,
+        "vis_sig_page": 1,
+        "vis_sig_text_size": 10,
+        "vis_sig_text": "Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{motivo_firma}}",
+        "vis_sig_graphic": "http://imagen-firma.com/logo.png"
+      }
+    }
+  ]
+}

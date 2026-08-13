@@ -1,0 +1,10 @@
+# Configuraciones locales sensibles
+.env
+*.key
+*.pem
+
+# Logs
+*.log
+
+# Docker
+.env.local

@@ -1,0 +1,30 @@
+{
+    "job": "ce3dc2fa-74a0-4180-90cc-db52c23760fa",
+    "nonce": "8f1c695379660e22d23aacf0bd7a630d",
+    "exp": 1786397503,
+    "kid": "default",
+    "token": "tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT",
+    "configuration": {
+        "signature_type": "basic",
+        "signature_reason": "Acepto el contenido del documento",
+        "generate_request": "NOMBRE EMPRESA"
+    },
+    "documents": [
+        {
+            "from": "http://10.21.132.143:8081/api/download.php?file=doc_prueba2.pdf",
+            "to": "http://10.21.132.143:8081/api/upload-signed.php?file=doc_prueba2.pdf&user_id=USER123",
+            "doc_sha256": "d5076e6e6ab7062b8fd7380e1e105214d482fa0876b2abc9b1a2badc0d4585d4",
+            "settings": {
+                "vis_sig_x": 340,
+                "vis_sig_y": 693,
+                "vis_sig_width": 155,
+                "vis_sig_height": 55,
+                "vis_sig_page": 1,
+                "vis_sig_text_size": 10,
+                "vis_sig_text": "Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{motivo_firma}}",
+                "vis_sig_graphic": "http://imagen-firma.com/logo.png"
+            }
+        }
+    ],
+    "created_at": 1786396903
+}

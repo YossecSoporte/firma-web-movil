@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Firmar con FirmEasy</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      padding: 16px; background: #f5f5f5;
+    }
+    .card {
+      background: #fff; border-radius: 12px; padding: 24px; width: 100%;
+      max-width: 800px; box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 8px; color: #1a1a1a; text-align: center; }
+    p.subtitle { color: #666; margin-bottom: 20px; font-size: .9rem; text-align: center; }
+
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .toolbar .count { font-size: .85rem; color: #6c757d; }
+    .refresh-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; font-size: .82rem; font-weight: 500;
+      background: #fff; color: #0066cc; border: 1px solid #0066cc; border-radius: 6px;
+      cursor: pointer; transition: all .15s;
+    }
+    .refresh-btn:hover { background: #0066cc; color: #fff; }
+    .refresh-btn svg { width: 14px; height: 14px; }
+    .refresh-btn .spin { animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== Tabla (escritorio / tablet horizontal) ===== */
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: #f8f9fa; padding: 12px 10px; text-align: left;
+      font-size: .78rem; font-weight: 600; color: #495057;
+      border-bottom: 2px solid #dee2e6; text-transform: uppercase; letter-spacing: .03em;
+    }
+    tbody td { padding: 14px 10px; border-bottom: 1px solid #e9ecef; font-size: .9rem; color: #212529; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f8f9fa; }
+
+    .doc-name { font-weight: 500; }
+    .doc-size { color: #6c757d; font-size: .85rem; }
+    .doc-status {
+      display: inline-block; padding: 3px 10px; border-radius: 12px;
+      font-size: .75rem; font-weight: 500;
+    }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-signed { background: #d4edda; color: #155724; }
+
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-action {
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 7px 12px; font-size: .82rem; font-weight: 500;
+      border: 1px solid transparent; border-radius: 6px;
+      cursor: pointer; text-decoration: none; transition: all .15s; white-space: nowrap;
+    }
+    .btn-action:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-view { background: #e9ecef; color: #495057; border-color: #dee2e6; }
+    .btn-view:hover:not(:disabled) { background: #dee2e6; }
+    .btn-sign { background: #0066cc; color: #fff; }
+    .btn-sign:hover:not(:disabled) { background: #0052a3; }
+    .btn-view-signed { background: #28a745; color: #fff; }
+    .btn-view-signed:hover:not(:disabled) { background: #218838; }
+    .btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    /* ===== Cards (móvil) ===== */
+    .cards-mobile { display: none; flex-direction: column; gap: 12px; }
+    .doc-card {
+      border: 1px solid #e9ecef; border-radius: 10px; padding: 14px; background: #fff;
+    }
+    .doc-card .dc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 8px; }
+    .doc-card .dc-name { font-weight: 600; font-size: .95rem; color: #1a1a1a; word-break: break-all; }
+    .doc-card .dc-meta { font-size: .8rem; color: #6c757d; margin-top: 2px; }
+    .doc-card .dc-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .doc-card .btn-action { width: 100%; padding: 10px; font-size: .88rem; }
+
+    .status-bar {
+      margin-top: 16px; padding: 12px 16px; border-radius: 8px;
+      font-size: .85rem; display: none;
+    }
+    .status-bar.info { background: #e7f1ff; color: #0052a3; }
+    .status-bar.error { background: #fdeaea; color: #c0392b; }
+    .status-bar.success { background: #e8f5e9; color: #2e7d32; }
+
+    .deep-link-display {
+      display: none; margin-top: 16px; padding: 12px; background: #f7fafc;
+      border-radius: 8px; font-size: .75rem; text-align: left; word-break: break-all;
+      font-family: monospace; border: 1px solid #e2e8f0;
+    }
+    .footer { margin-top: 20px; font-size: .75rem; color: #999; text-align: center; }
+    .empty-state { text-align: center; padding: 40px 20px; color: #6c757d; }
+
+    /* ===== Breakpoint responsive ===== */
+    @media (max-width: 640px) {
+      body { padding: 12px; }
+      .card { padding: 18px; }
+      .table-wrap { display: none; }
+      .cards-mobile { display: flex; }
+      h1 { font-size: 1.3rem; }
+      .toolbar { flex-direction: column; align-items: stretch; }
+      .refresh-btn { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Firmar documentos</h1>
+    <p class="subtitle">Selecciona un documento y presiona Firmar para abrir FirmEasy.</p>
+
+    <div class="toolbar">
+      <span id="docCount" class="count">Cargando...</span>
+      <button id="btnRefresh" class="refresh-btn" type="button">
+        <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        <span id="refreshLabel">Actualizar</span>
+      </button>
+    </div>
+
+    <!-- Tabla para escritorio -->
+    <div class="table-wrap">
+      <table id="docsTable">
+        <thead>
+          <tr>
+            <th>Documento</th>
+            <th>Tamaño</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="docsBody">
+          <tr><td colspan="4" class="empty-state">Cargando documentos...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Cards para móvil -->
+    <div id="cardsMobile" class="cards-mobile">
+      <div class="empty-state">Cargando documentos...</div>
+    </div>
+
+    <div id="statusBar" class="status-bar"></div>
+
+    <div id="deepLinkDisplay" class="deep-link-display">
+      <strong>URI generada:</strong>
+      <div id="deepLinkUri" style="margin-top: 4px;"></div>
+    </div>
+
+    <div class="footer">Requiere app FirmEasy instalada en este dispositivo.</div>
+  </div>
+
+<script>
+    (function () {
+      // ===== CONFIGURACIÓN =====
+      const API_URL             = '/api/generar-uri.php';
+      const LIST_URL            = '/api/list-pdfs.php';
+      const LIST_SIGNED_URL     = '/api/list-signed.php';
+      const DOWNLOAD_URL        = '/api/download.php';
+      const DOWNLOAD_SIGNED_URL = '/api/download-signed.php';
+      const CLEAR_SIGNED_URL    = '/api/clear-signed.php';
+      const ACTION              = 'sign';
+      const FALLBACK_URL        = 'app-no-instalada.php';
+      const FALLBACK_DELAY_MS   = 3500;
+      const VISIBILITY_GRACE_MS = 5000;
+
+      // ===== ELEMENTOS =====
+      const tbody       = document.getElementById('docsBody');
+      const cardsMobile = document.getElementById('cardsMobile');
+      const statusBar   = document.getElementById('statusBar');
+      const docCount    = document.getElementById('docCount');
+      const btnRefresh  = document.getElementById('btnRefresh');
+      const refreshIcon = document.getElementById('refreshIcon');
+      const refreshLabel = document.getElementById('refreshLabel');
+
+      let signedMap = {};
+
+      // ===== ICONOS =====
+      const ICO_VIEW   = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+      const ICO_SIGN   = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>';
+      const ICO_SIGNED  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+      const ICO_WAIT    = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>';
+
+      // ===== UTILIDADES =====
+      function showStatus(msg, type) {
+        statusBar.textContent = msg;
+        statusBar.className = 'status-bar ' + type;
+        statusBar.style.display = msg ? 'block' : 'none';
+      }
+      function formatBytes(b) {
+        if (b === 0) return '0 B';
+        const k = 1024, sizes = ['B','KB','MB','GB'];
+        const i = Math.floor(Math.log(b) / Math.log(k));
+        return parseFloat((b / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      }
+      function baseName(f) { return f.replace(/\.pdf$/i, ''); }
+      function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+      function escapeAttr(s) { return String(s).replace(/"/g,'"').replace(/'/g,'&#39;').replace(/</g,'<').replace(/>/g,'>'); }
+
+      // ===== CARGA DE LISTAS =====
+      async function loadSignedList() {
+        try {
+          const r = await fetch(LIST_SIGNED_URL, { credentials: 'same-origin' });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const data = await r.json();
+          signedMap = {};
+          if (data.success && data.files) {
+            data.files.forEach(function(f) {
+              const base = f.filename.replace(/_[^_]+\.pdf$/i, '');
+              signedMap[base] = { filename: f.filename, url: f.url, size: f.size, modified: f.modified };
+            });
+          }
+        } catch (e) { console.warn('No se pudo cargar lista de firmados:', e.message); }
+      }
+
+      async function loadPdfList() {
+        showStatus('', 'info');
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Cargando documentos...</td></tr>';
+        cardsMobile.innerHTML = '<div class="empty-state">Cargando documentos...</div>';
+
+        await loadSignedList();
+
+        try {
+          const resp = await fetch(LIST_URL, { credentials: 'same-origin' });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          const data = await resp.json();
+
+          if (!data.success || data.files.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No hay PDFs disponibles</td></tr>';
+            cardsMobile.innerHTML = '<div class="empty-state">No hay PDFs disponibles</div>';
+            docCount.textContent = '0 documentos';
+            return;
+          }
+
+          docCount.textContent = data.files.length + ' documento' + (data.files.length !== 1 ? 's' : '');
+
+          // Render tabla (escritorio)
+          tbody.innerHTML = data.files.map(function(f) {
+            const base = baseName(f.filename);
+            const isSigned = signedMap.hasOwnProperty(base);
+            const si = signedMap[base];
+            const signedUrl = si ? (DOWNLOAD_SIGNED_URL + '?file=' + encodeURIComponent(si.filename)) : '#';
+            const viewUrl = DOWNLOAD_URL + '?file=' + encodeURIComponent(f.filename);
+            return '<tr>'
+              + '<td class="doc-name">' + escapeHtml(f.filename) + '</td>'
+              + '<td class="doc-size">' + formatBytes(f.size) + '</td>'
+              + '<td>' + (isSigned ? '<span class="doc-status status-signed">Firmado</span>' : '<span class="doc-status status-pending">Pendiente</span>') + '</td>'
+              + '<td><div class="actions">'
+              +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
+              +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
+              +   (isSigned
+                    ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver firmado</a>'
+                    : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver firmado</button>')
+              + '</div></td></tr>';
+          }).join('');
+
+          // Render cards (móvil)
+          cardsMobile.innerHTML = data.files.map(function(f) {
+            const base = baseName(f.filename);
+            const isSigned = signedMap.hasOwnProperty(base);
+            const si = signedMap[base];
+            const signedUrl = si ? (DOWNLOAD_SIGNED_URL + '?file=' + encodeURIComponent(si.filename)) : '#';
+            const viewUrl = DOWNLOAD_URL + '?file=' + encodeURIComponent(f.filename);
+            return '<div class="doc-card">'
+              + '<div class="dc-header">'
+              +   '<div><div class="dc-name">' + escapeHtml(f.filename) + '</div><div class="dc-meta">' + formatBytes(f.size) + '</div></div>'
+              +   (isSigned ? '<span class="doc-status status-signed">Firmado</span>' : '<span class="doc-status status-pending">Pendiente</span>')
+              + '</div>'
+              + '<div class="dc-actions">'
+              +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
+              +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
+              +   (isSigned
+                    ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver PDF firmado</a>'
+                    : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver PDF firmado</button>')
+              + '</div></div>';
+          }).join('');
+
+          // Listeners Firmar (ambas vistas)
+          document.querySelectorAll('.btn-sign').forEach(function(btn) {
+            btn.addEventListener('click', function() { openApp(btn); });
+          });
+
+        } catch (err) {
+          tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Error al cargar</td></tr>';
+          cardsMobile.innerHTML = '<div class="empty-state">Error al cargar documentos</div>';
+          docCount.textContent = 'Error';
+          showStatus('No se pudo cargar la lista: ' + err.message, 'error');
+        }
+      }
+
+      // ===== BOTÓN ACTUALIZAR: limpia firmados + recarga =====
+      async function refreshAll() {
+        refreshIcon.classList.add('spin');
+        refreshLabel.textContent = 'Limpiando...';
+        btnRefresh.disabled = true;
+
+        try {
+          // 1) Eliminar todos los PDFs firmados (residuos)
+          const resp = await fetch(CLEAR_SIGNED_URL + '?confirm=1', { method: 'POST', credentials: 'same-origin' });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          const result = await resp.json();
+          console.log('Firmados eliminados:', result.deleted);
+        } catch (e) {
+          console.warn('No se pudo limpiar firmados:', e.message);
+        }
+
+        // 2) Recargar lista desde cero
+        await loadPdfList();
+        showStatus('Documentos limpiados. Estado restaurado.', 'success');
+        setTimeout(function() { showStatus('', 'info'); }, 3000);
+
+        refreshIcon.classList.remove('spin');
+        refreshLabel.textContent = 'Actualizar';
+        btnRefresh.disabled = false;
+      }
+
+      // ===== FIRMAR =====
+      async function openApp(btn) {
+        const selectedFile = btn.getAttribute('data-file');
+        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
+
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = ICO_WAIT + ' Preparando...';
+        showStatus('Obteniendo URI de firma para ' + selectedFile + '...', 'info');
+
+        let data;
+        try {
+          const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              configuration: {
+                signature_type: 'basic',
+                signature_reason: 'Acepto el contenido del documento',
+                generate_request: 'NOMBRE EMPRESA'
+              },
+              documents: [{
+                file: selectedFile, user_id: 'USER123', doc_sha256: '',
+                settings: {
+                  vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
+                  vis_sig_page: 1, vis_sig_text_size: 10,
+                  vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{motivo_firma}}',
+                  vis_sig_graphic: 'http://imagen-firma.com/logo.png'
+                }
+              }]
+            }),
+            credentials: 'same-origin'
+          });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          data = await resp.json();
+        } catch (err) {
+          btn.disabled = false; btn.innerHTML = originalHtml;
+          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
+          return;
+        }
+
+        btn.disabled = false; btn.innerHTML = originalHtml;
+        const deepLink = data.uri;
+
+        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
+        document.getElementById('deepLinkUri').textContent = deepLink;
+        deepLinkDisplay.style.display = 'block';
+
+        console.log('=== FIRMEASY DEEP LINK ===');
+        console.log('URI:', deepLink);
+
+        showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + '...', 'info');
+
+        const start = Date.now();
+        let fallbackTriggered = false;
+        const timer = setTimeout(function () {
+          if (fallbackTriggered) return;
+          if (Date.now() - start < VISIBILITY_GRACE_MS && document.visibilityState === 'visible') {
+            fallbackTriggered = true;
+            window.location.href = FALLBACK_URL;
+          }
+        }, FALLBACK_DELAY_MS);
+
+        function cancelFallback() {
+          if (!fallbackTriggered) { clearTimeout(timer); fallbackTriggered = true; }
+        }
+        document.addEventListener('visibilitychange', function onVis() {
+          if (document.visibilityState === 'hidden') cancelFallback();
+        }, { once: true });
+        window.addEventListener('pagehide', cancelFallback, { once: true });
+        window.addEventListener('blur', cancelFallback, { once: true });
+
+        window.location.href = deepLink;
+
+        // Recargar al volver (la app ya subió el PDF)
+        window.addEventListener('focus', function onBack() {
+          window.removeEventListener('focus', onBack);
+          setTimeout(loadPdfList, 2000);
+        }, { once: true });
+      }
+
+      // ===== INIT =====
+      btnRefresh.addEventListener('click', refreshAll);
+      loadPdfList();
+    })();
+  </script>
+</body>
+</html>
