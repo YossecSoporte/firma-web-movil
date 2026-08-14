@@ -95,6 +95,36 @@
     .footer { margin-top: 20px; font-size: .75rem; color: #999; text-align: center; }
     .empty-state { text-align: center; padding: 40px 20px; color: #6c757d; }
 
+    /* ===== Modal para token y certificate_type ===== */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+      z-index: 1000; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: 12px; padding: 24px; width: 100%; max-width: 400px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.15); animation: modalIn .15s ease-out;
+    }
+    @keyframes modalIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .modal h3 { margin-bottom: 16px; font-size: 1.1rem; color: #1a1a1a; text-align: center; }
+    .modal .form-group { margin-bottom: 14px; }
+    .modal label { display: block; margin-bottom: 6px; font-size: .85rem; font-weight: 500; color: #333; }
+    .modal input, .modal select {
+      width: 100%; padding: 10px 12px; font-size: .9rem; border: 1px solid #ced4da; border-radius: 6px;
+      background: #fff; color: #212529; transition: border-color .15s, box-shadow .15s;
+    }
+    .modal input:focus, .modal select:focus { outline: none; border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0,102,204,.15); }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+    .modal-btn {
+      padding: 10px 20px; font-size: .88rem; font-weight: 500; border-radius: 6px;
+      cursor: pointer; transition: all .15s; border: 1px solid transparent;
+    }
+    .modal-btn.cancel { background: #fff; color: #6c757d; border-color: #dee2e6; }
+    .modal-btn.cancel:hover { background: #f8f9fa; }
+    .modal-btn.confirm { background: #0066cc; color: #fff; }
+    .modal-btn.confirm:hover { background: #0052a3; }
+    .modal-btn:disabled { opacity: .6; cursor: not-allowed; }
+
     /* ===== Breakpoint responsive ===== */
     @media (max-width: 640px) {
       body { padding: 12px; }
@@ -150,6 +180,29 @@
     </div>
 
     <div class="footer">Requiere app FirmEasy instalada en este dispositivo.</div>
+  </div>
+
+  <!-- Modal Token + Certificate Type -->
+  <div id="signModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <h3 id="modalTitle">Configurar firma</h3>
+      <div class="form-group">
+        <label for="modalToken">Token de seguridad</label>
+        <input type="password" id="modalToken" placeholder="Ingrese su token" autocomplete="off" required>
+      </div>
+      <div class="form-group">
+        <label for="modalCertType">Tipo de certificado</label>
+        <select id="modalCertType">
+          <option value="all">Todos (DNI + Certificado)</option>
+          <option value="dni">Solo DNI</option>
+          <option value="certificado">Solo Certificado</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn cancel" id="modalCancel">Cancelar</button>
+        <button type="button" class="modal-btn confirm" id="modalConfirm">Continuar</button>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -317,13 +370,45 @@
       }
 
       // ===== FIRMAR =====
-      async function openApp(btn) {
-        const selectedFile = btn.getAttribute('data-file');
+      let pendingFile = null;
+
+      function showSignModal(file) {
+        pendingFile = file;
+        document.getElementById('modalToken').value = '';
+        document.getElementById('modalCertType').value = 'all';
+        document.getElementById('signModal').classList.add('open');
+        document.getElementById('modalToken').focus();
+      }
+
+      function hideSignModal() {
+        document.getElementById('signModal').classList.remove('open');
+        pendingFile = null;
+      }
+
+      document.getElementById('modalCancel').addEventListener('click', hideSignModal);
+      document.getElementById('modalConfirm').addEventListener('click', async function() {
+        const token = document.getElementById('modalToken').value.trim();
+        const certificateType = document.getElementById('modalCertType').value;
+        if (!token) {
+          showStatus('Token requerido', 'error');
+          return;
+        }
+        const file = pendingFile;
+        hideSignModal();
+        await doSign(file, token, certificateType);
+      });
+
+      // Cerrar modal con Escape
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') hideSignModal();
+      });
+
+      async function doSign(selectedFile, userToken, certificateType) {
         if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
 
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = ICO_WAIT + ' Preparando...';
+        const btn = document.querySelector('.btn-sign[data-file="' + escapeAttr(selectedFile) + '"]');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
         showStatus('Obteniendo URI de firma para ' + selectedFile + '...', 'info');
 
         let data;
@@ -335,8 +420,10 @@
               configuration: {
                 signature_type: 'basic',
                 signature_reason: 'Acepto el contenido del documento',
-                generate_request: 'NOMBRE EMPRESA'
+                generate_request: 'NOMBRE EMPRESA',
+                certificate_type: certificateType
               },
+              token: userToken,
               documents: [{
                 file: selectedFile, user_id: 'USER123', doc_sha256: '',
                 settings: {
@@ -349,23 +436,30 @@
             }),
             credentials: 'same-origin'
           });
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || 'HTTP ' + resp.status);
+          }
           data = await resp.json();
         } catch (err) {
-          btn.disabled = false; btn.innerHTML = originalHtml;
+          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
           showStatus('No se pudo obtener la URI: ' + err.message, 'error');
           return;
         }
 
-        btn.disabled = false; btn.innerHTML = originalHtml;
-        const deepLink = data.uri;
+        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+
+        // Usar URI encriptada para el deep link: firmeasy://sign?data=BLOB
+        const encryptedBlob = data.uri_encrypted || data.data;
+        const deepLink = 'firmeasy://sign?data=' + encodeURIComponent(encryptedBlob);
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
-        document.getElementById('deepLinkUri').textContent = deepLink;
+        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK ===');
-        console.log('URI:', deepLink);
+        console.log('Encrypted:', deepLink);
+        console.log('Plain:', data.uri_plain);
 
         showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + '...', 'info');
 
@@ -395,6 +489,13 @@
           window.removeEventListener('focus', onBack);
           setTimeout(loadPdfList, 2000);
         }, { once: true });
+      }
+
+      // Wrapper para mantener compatibilidad con onclick directo
+      async function openApp(btn) {
+        const selectedFile = btn.getAttribute('data-file');
+        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
+        showSignModal(selectedFile);
       }
 
       // ===== INIT =====

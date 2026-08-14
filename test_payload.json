@@ -2,8 +2,10 @@
   "configuration": {
     "signature_type": "basic",
     "signature_reason": "Acepto el contenido del documento",
-    "generate_request": "NOMBRE EMPRESA"
+    "generate_request": "NOMBRE EMPRESA",
+    "certificate_type": "all"
   },
+  "token": "TOKEN_DE_PRUEBA_123",
   "documents": [
     {
       "file": "doc_prueba1.pdf",

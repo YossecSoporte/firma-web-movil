@@ -7,7 +7,7 @@
 ## 1. Qué es este proyecto
 
 **FirmEasy Web** — backend web (PHP + Nginx en Docker) que:
-1. Genera **jobs de firma** y lanza la **app móvil FirmEasy** mediante deep link `firmeasy://sign?...`.
+1. Genera **jobs de firma** y lanza la **app móvil FirmEasy** mediante deep link `firmeasy://sign?data=<encrypted_blob>`.
 2. Sirve los PDFs a firmar (originales) y recibe los PDFs firmados que sube la app móvil.
 3. Muestra una interfaz web (tabla responsive) para que el usuario elija qué PDF firmar.
 
@@ -15,6 +15,7 @@
 - PHP 8.3 (sin framework) + Nginx + Supervisor, en Docker.
 - Sin base de datos — los jobs se guardan como archivos JSON en `storage/jobs/`.
 - Puerto host: **8081** (mapeado al puerto 80 del contenedor).
+- **Encriptación AES-256-GCM** de la URI completa (clave en `ENCRYPTION_KEY`).
 
 ---
 

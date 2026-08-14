@@ -3,20 +3,22 @@
 /**
  * Endpoint: api/generar-uri.php
  * Método: POST
- * Genera un job para firma y devuelve la URI firmeasy://
+ * Genera un job para firma y devuelve la URI firmeasy:// encriptada
  *
- * Entrada (JSON body) - FORMATO SIMPLIFICADO:
+ * Entrada (JSON body):
  * {
  *   "configuration": {
  *     "signature_type": "basic",
  *     "signature_reason": "Acepto el contenido del documento",
- *     "generate_request": "NOMBRE EMPRESA"
+ *     "generate_request": "NOMBRE EMPRESA",
+ *     "certificate_type": "all"
  *   },
+ *   "token": "TOKEN_USUARIO",
  *   "documents": [
  *     {
- *       "file": "doc_prueba1.pdf",           // nombre del archivo en document/
- *       "user_id": "USER123",                // para construir URL "to"
- *       "doc_sha256": "a1b2c3d4e5f6...",     // opcional, se calcula si no viene
+ *       "file": "doc_prueba1.pdf",
+ *       "user_id": "USER123",
+ *       "doc_sha256": "a1b2c3d4e5f6...",
  *       "settings": { ... }
  *     }
  *   ]
@@ -28,23 +30,37 @@
  *
  * Respuesta:
  * {
- *   "uri": "firmeasy://sign?job=...&nonce=...&exp=...&kid=default&token=...",
+ *   "uri_encrypted": "BASE64URL_BLOB",
+ *   "uri_plain": "firmeasy://sign?job=...&exp=...&token=...",
  *   "job": "...",
- *   "nonce": "...",
  *   "exp": 1786140125,
- *   "token": "tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT"
+ *   "data": "BASE64URL_BLOB"
  * }
+ *
+ * Deep link final: firmeasy://sign?data=BASE64URL_BLOB
  */
 
 // Configuración
 const STORAGE_DIR = __DIR__ . '/../storage/jobs';
 const TOKEN_FIJO = 'tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT';
-const KID = 'default';
 const EXPIRACION_SEGUNDOS = 600; // 10 minutos
 
-// Base URL del sistema externo (configurar via variable de entorno BASE_URL_EXTERNO)
-// Ejemplos: 'https://192.168.8.0:5000', 'https://tu-dominio.com'
-$BASE_URL_EXTERNO = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://10.21.132.143:8081', '/');
+// Base URL del sistema externo
+$BASE_URL_EXTERNO = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://localhost:8081', '/');
+
+// Clave de encriptación (32 bytes base64)
+$ENCRYPTION_KEY_B64 = getenv('ENCRYPTION_KEY');
+if (empty($ENCRYPTION_KEY_B64)) {
+    http_response_code(500);
+    echo json_encode(['error' => 'ENCRYPTION_KEY no configurada en entorno']);
+    exit;
+}
+$ENCRYPTION_KEY = base64_decode($ENCRYPTION_KEY_B64);
+if (strlen($ENCRYPTION_KEY) !== 32) {
+    http_response_code(500);
+    echo json_encode(['error' => 'ENCRYPTION_KEY debe ser 32 bytes (base64 de 32 bytes)']);
+    exit;
+}
 
 // CORS
 header('Access-Control-Allow-Origin: *');
@@ -79,9 +95,25 @@ if (!isset($data['configuration']) || !isset($data['documents']) || !is_array($d
     exit;
 }
 
+// Validar token
+if (!isset($data['token']) || empty($data['token'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Campo "token" requerido en el body.']);
+    exit;
+}
+$userToken = $data['token'];
+
+// Validar certificate_type
+$certificateType = $data['configuration']['certificate_type'] ?? 'all';
+if (!in_array($certificateType, ['all', 'dni', 'certificado'], true)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'certificate_type debe ser: all, dni o certificado']);
+    exit;
+}
+
 $doc = $data['documents'][0]; // Solo el primer documento
 
-// Validar campos requeridos del documento (formato simplificado)
+// Validar campos requeridos del documento
 $required = ['file', 'user_id', 'settings'];
 foreach ($required as $field) {
     if (!isset($doc[$field])) {
@@ -121,18 +153,15 @@ if (empty($docSha256)) {
 $fromUrl = $BASE_URL_EXTERNO . '/api/download.php?file=' . rawurlencode($fileName);
 $toUrl   = $BASE_URL_EXTERNO . '/api/upload-signed.php?file=' . rawurlencode($fileName) . '&user_id=' . rawurlencode($userId);
 
-// Generar job, nonce, exp
+// Generar job, exp
 $job = generateUuidV4();
-$nonce = bin2hex(random_bytes(16));
 $exp = time() + EXPIRACION_SEGUNDOS;
 
-// Preparar datos para guardar (con URLs completas ya construidas)
+// Preparar datos para guardar
 $jobData = [
     'job' => $job,
-    'nonce' => $nonce,
     'exp' => $exp,
-    'kid' => KID,
-    'token' => TOKEN_FIJO,
+    'token' => $userToken,
     'configuration' => $data['configuration'],
     'documents' => [
         [
@@ -153,19 +182,38 @@ if (!file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHE
     exit;
 }
 
-// Construir URI - job es la URL completa al endpoint /api/job/{job}
+// Construir URI plano (sin nonce, sin kid)
 $jobUrl = $BASE_URL_EXTERNO . '/api/job/' . $job;
-$uri = "firmeasy://sign?job=" . rawurlencode($jobUrl) . "&nonce=$nonce&exp=$exp&kid=" . KID . "&token=" . rawurlencode(TOKEN_FIJO);
+$plainUri = "firmeasy://sign?job=" . rawurlencode($jobUrl) . "&exp=$exp&token=" . rawurlencode($userToken);
+
+// Encriptar URI completa
+$encryptedBlob = encryptUri($plainUri, $ENCRYPTION_KEY);
 
 // Respuesta
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode([
-    'uri' => $uri,
+    'uri_encrypted' => $encryptedBlob,
+    'uri_plain' => $plainUri,
     'job' => $job,
-    'nonce' => $nonce,
     'exp' => $exp,
-    'token' => TOKEN_FIJO
+    'data' => $encryptedBlob
 ], JSON_UNESCAPED_SLASHES);
+
+/**
+ * Encripta una URI con AES-256-GCM
+ * Formato salida: base64url( IV(12) || CIPHERTEXT || TAG(16) )
+ */
+function encryptUri(string $plaintext, string $key): string
+{
+    $iv = random_bytes(12);
+    $tag = '';
+    $ciphertext = openssl_encrypt($plaintext, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag, '', 16);
+    if ($ciphertext === false) {
+        throw new Exception('Error encriptando URI');
+    }
+    $blob = $iv . $ciphertext . $tag;
+    return rtrim(strtr(base64_encode($blob), '+/', '-_'), '=');
+}
 
 /**
  * Genera UUID v4 RFC 4122
