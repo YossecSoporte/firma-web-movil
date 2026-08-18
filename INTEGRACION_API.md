@@ -13,50 +13,55 @@ Documentación para sistemas externos (backends de clientes) que deseen integrar
 > 1. **No es una URL web** (no se abre en el navegador como `https://...`)
 > 2. **Usa un esquema personalizado** `firmeasy://` registrado por la app móvil FirmEasy
 > 3. **Lanza directamente la app nativa** en el móvil del usuario final
-> 4. **Transporta todos los parámetros** necesarios para la firma (job, nonce, expiración, token)
+> 4. **Transporta todos los parámetros cifrados** con **AES-256-GCM** (job, expiración, token)
 >
 > **Ejemplo:**
 > ```
-> firmeasy://sign?job=http%3A%2F%2F10.21.132.143%3A8081%2Fapi%2Fjob%2Fabc123&nonce=xyz789&exp=1786393069&kid=default&token=tkn_ind_...
+> firmeasy://sign?data=BASE64URL_BLOB
 > ```
+> donde el blob es `base64url( IV(12 bytes) || CIPHERTEXT || TAG(16 bytes) )` del contenido `firmeasy://sign?job=...&exp=...&token=...`.
 >
-> **En tu frontend web:** haces `window.location.href = response.uri` → el SO del móvil intercepta el esquema `firmeasy://` y abre la app FirmEasy automáticamente.
+> **En tu frontend web:** haces `window.location.href = "firmeasy://sign?data=" + response.uri_encrypted` → el SO del móvil intercepta el esquema `firmeasy://` y abre la app FirmEasy automáticamente.
 >
 > Si la app **no está instalada**, el navegador cae a `app-no-instalada.php` (página con enlaces a Play Store / App Store).
 
 ---
 
-## Parámetros de la URI `firmeasy://`
+## Deep link cifrado con AES-256-GCM
 
-La URI devuelta por el API tiene esta forma genérica:
+El deep link final es `firmeasy://sign?data=<BASE64URL_BLOB>`. **Todo** (job, exp, token) viaja **cifrado** — no hay parámetros en claro.
 
-```
-firmeasy://sign?job={JOB_URL}&nonce={NONCE}&exp={EXP}&kid={KID}&token={TOKEN}
-```
+- **Algoritmo:** AES-256-GCM
+- **Formato blob:** `base64url( IV(12 bytes) || CIPHERTEXT || TAG(16 bytes) )`
+- **Clave:** `ENCRYPTION_KEY` (base64 de 32 bytes), compartida entre el backend y la app móvil FirmEasy
+- **Contenido descifrado:** `firmeasy://sign?data={URL_ENCODED_DE_GET_/api/job/{job}}&exp={unix_ts}&token={token_del_usuario}`
 
-### Descripción de cada parámetro
+### Contenido del blob descifrado
 
-| Parámetro | Tipo | Descripción |
-|-----------|------|-------------|
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
 | `job` | string (URL, **urlencodeado**) | URL completa del endpoint `/api/job/{job_id}` que la app móvil consulta para obtener la configuración de firma (`from`, `to`, `doc_sha256`, `settings`) |
-| `nonce` | string hex (32 chars) | Número de uso único (single-use) que protege contra re intentos. Generado aleatoriamente con `random_bytes(16)` |
 | `exp` | integer (Unix timestamp) | Fecha/hora de expiración del job. **10 minutos** desde la creación (`EXPIRACION_SEGUNDOS = 600`). Si la app abre la URI después de `exp`, debe rechazarla |
-| `kid` | string | Identificador de la clave (Key ID). Valor fijo: `"default"` |
-| `token` | string | Token de autenticación fijo hardcoded: `tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT` |
+| `token` | string | Token del usuario final (el que escribió en el modal de la web) |
 
-### Ejemplo real de URI
+### Descifrado (pseudocódigo Kotlin)
 
-```
-firmeasy://sign?job=http%3A%2F%2F10.21.132.143%3A8081%2Fapi%2Fjob%2Fef1d54ae-e5d9-44f2-b3fa-f4e6dabdbedc&nonce=07e6d2b48f546c8af63835f93892fddb&exp=1786393069&kid=default&token=tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT
+```kotlin
+val decoded = Base64.getUrlDecoder().decode(blob)
+val iv  = decoded.copyOfRange(0, 12)
+val tag = decoded.copyOfRange(decoded.size - 16, decoded.size)
+val ct  = decoded.copyOfRange(12, decoded.size - 16)
+val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
+val uri = cipher.doFinal(ct + tag)  // "firmeasy://sign?job=...&exp=...&token=..."
 ```
 
 ### Validaciones que debe hacer la app móvil al recibir la URI
 
-1. **Verificar `exp`** — Si `exp < time()`, rechazar con error "Job expirado"
-2. **Verificar `kid`** — Debe ser `"default"` (único soportado por ahora)
-3. **Verificar `token`** — Debe coincidir con el token fijo esperado
-4. **Consumir `job`** — Hacer `GET {job}` (URL decodificada) para obtener `from` (descarga PDF) y `to` (subida PDF firmado)
-5. **Usar `nonce` single-use** — (Pendiente validar estrictamente en servidor) Idealmente invalidar el tras primer uso
+1. **Descifrar `data`** con AES-256-GCM (clave `ENCRYPTION_KEY`); si el tag no verifica → rechazar
+2. **Verificar `exp`** — Si `exp < time()`, rechazar con error "Job expirado"
+3. **Consumir `job`** — Hacer `GET {job}` (URL decodificada) para obtener `from` (descarga PDF) y `to` (subida PDF firmado)
+4. Descargar el PDF de `from`, firmarlo y subirlo a `to` (binario)
 
 ---
 
@@ -66,7 +71,7 @@ firmeasy://sign?job=http%3A%2F%2F10.21.132.143%3A8081%2Fapi%2Fjob%2Fef1d54ae-e5d
 
 Crea un **job de firma** y devuelve la URI completa `firmeasy://` para lanzar la app móvil.
 
-**URL base:** `http://10.21.132.143:8081` (o el dominio/IP donde se despliegue el servicio)
+**URL base:** `http://<IP>:8081` (la IP/dominio donde se despliegue el servicio; ver AGENTS.md §3). Actualmente en local: `http://localhost:8081`.
 
 ---
 
@@ -91,7 +96,8 @@ Content-Type: application/json
   "configuration": {
     "signature_type": "basic",
     "signature_reason": "Acepto el contenido del documento",
-    "generate_request": "NOMBRE EMPRESA"
+    "generate_request": "NOMBRE EMPRESA",
+    "certificate_type": "all"
   },
   "documents": [
     {
@@ -124,6 +130,13 @@ Content-Type: application/json
 | `signature_type` | string | Sí | Tipo de firma. Valor actual: `"basic"` |
 | `signature_reason` | string | Sí | Motivo/razón de la firma. Se usa en el placeholder `{{signature_reason}}` del texto visible |
 | `generate_request` | string | Sí | Nombre de la empresa/solicitante que aparece en la app |
+| `certificate_type` | string | No | `"all"` \| `"dni"` \| `"certificado"` (default `"all"`) |
+
+### Nivel 1: `token` (string, requerido)
+
+Token que escribió el usuario final en el modal de la web. **Es obligatorio en este POST** (si falta → `400`). Viaja cifrado dentro del blob `data`.
+
+> **Ojo:** `token` **solo va en el request del POST**. No aparece en la respuesta de `GET /api/job/{id}` (se oculta a propósito por seguridad). El `token` y `exp` solo se obtienen del blob descifrado.
 
 ### Nivel 1: `documents` (array, requerido, mínimo 1)
 
@@ -131,10 +144,26 @@ Actualmente **solo se procesa el primer elemento** del array.
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
-| `file` | string | Sí | Nombre del archivo PDF en la carpeta `document/` del servidor (ej: `doc_prueba1.pdf`) |
-| `user_id` | string | Sí | Identificador único del usuario/firmante. Se usa para nombrar el PDF firmado: `{base}_{user_id}.pdf` |
-| `doc_sha256` | string | No | Hash SHA-256 del PDF (64 chars hex). Si vacío, el servidor lo calcula automáticamente |
+| `file` | string | Condicional | Nombre del archivo PDF en `document/` (requerido si no se envía `data`) |
+| `user_id` | string | Sí | Identificador del usuario/firmante |
+| `doc_sha256` | string | No | Hash SHA-256 del PDF (se calcula automáticamente si se omite) |
+| `data` | string | No | **URL personalizada** que la app móvil usará para obtener la config del job. Si se omite, se usa `/api/job/{uuid}` |
 | `settings` | object | Sí | Configuración visual de la firma (lo consume la app móvil) |
+
+### Campo `data` — URL Flexible
+
+El parámetro `data` permite al cliente definir **cualquier URL válida** como endpoint de configuración del job. No hay restricción de estructura.
+
+**Ejemplos de URLs válidas:**
+
+| URL | Descripción |
+|---|---|
+| `http://localhost:8081/api/job/{uuid}` | Endpoint estándar (por defecto) |
+| `http://localhost:8081/api/firma/{uuid}` | Endpoint personalizado |
+| `http://mi-backend.com/api/v1/firma/12345` | API externa del cliente |
+| `https://empresa.com/firma?id=abc123` | Cualquier URL accesible |
+
+**Importante:** El endpoint que el cliente defina debe retornar la misma estructura JSON que el endpoint estándar (`configuration`, `documents`, `settings`).
 
 ### Nivel 3: `settings` (objeto, requerido)
 
@@ -158,29 +187,31 @@ Actualmente **solo se procesa el primer elemento** del array.
 **Éxito (200):**
 ```json
 {
-  "uri": "firmeasy://sign?job=http%3A%2F%2F10.21.132.143%3A8081%2Fapi%2Fjob%2F{uuid}&nonce={hex32}&exp={unix_ts}&kid=default&token=tkn_ind_...",
+  "uri_encrypted": "BASE64URL_BLOB",
+  "uri_plain": "firmeasy://sign?job=http%3A%2F%2F<IP>%3A8081%2Fapi%2Fjob%2F{uuid}&exp={unix_ts}&token=TOKEN_DEL_USUARIO",
   "job": "uuid-v4-del-job",
-  "nonce": "hex32-aleatorio",
-  "exp": 1786393069,
-  "token": "tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT"
+  "exp": 1786726430,
+  "data": "BASE64URL_BLOB"
 }
 ```
 
 | Campo | Descripción |
 |-------|-------------|
-| `uri` | **Deep link completo** listo para abrir en navegador móvil → lanza app FirmEasy |
+| `uri_encrypted` | **Blob cifrado AES-256-GCM** (mismo valor que `data`). Es el que va como `firmeasy://sign?data=...` para lanzar la app |
+| `uri_plain` | URI en claro **solo para depuración**. No debe mostrarse en producción |
 | `job` | UUID v4 del job (para consultar estado vía `/api/job/{job}`) |
-| `nonce` | Nonce hex de 32 chars (single-use, expira en 10 min) |
 | `exp` | Timestamp Unix de expiración (10 minutos desde creación) |
-| `token` | Token fijo hardcoded (kid=default) |
+| `data` | Alias de `uri_encrypted` (deep link final) |
+
+**Deep link final:** `firmeasy://sign?data=BASE64URL_BLOB`
 
 **Errores:**
 | Código | Causa |
 |--------|-------|
-| 400 | JSON inválido, campos faltantes, `doc_sha256` mal formado |
+| 400 | JSON inválido, campos faltantes, `token` vacío, `certificate_type` inválido, `doc_sha256` mal formado |
 | 404 | Archivo `file` no existe en `document/` |
 | 405 | Método no POST |
-| 500 | Error interno (guardado job, cálculo hash) |
+| 500 | Error interno (guardado job, cálculo hash, `ENCRYPTION_KEY` no configurada) |
 
 ---
 
@@ -190,8 +221,8 @@ Actualmente **solo se procesa el primer elemento** del array.
 1. Cliente (usuario final) está en tu sistema web
 2. Tu backend prepara el JSON con el PDF a firmar (debe estar en document/ del servidor FirmEasy)
 3. Tu backend hace POST /api/generar-uri.php
-4. Recibe la URI firmeasy://
-5. Tu frontend redirige al usuario: window.location.href = response.uri
+4. Recibe `uri_encrypted` (blob AES-256-GCM)
+5. Tu frontend redirige al usuario: window.location.href = "firmeasy://sign?data=" + response.uri_encrypted
    - En móvil: abre app FirmEasy directamente
    - En desktop: cae a app-no-instalada.php (enlaces a stores)
 6. App móvil firma y sube PDF firmado a /api/upload-signed.php
@@ -208,10 +239,10 @@ El esquema `firmeasy://` **NO redirige automáticamente a Play Store**. El SO de
 
 #### Opción A — Página intermedia (implementación actual)
 
-El frontend redirige a `response.uri` y si la app no abre en ~3.5s, redirige a `app-no-instalada.php` (página con botones manuales a Play Store / App Store).
+El frontend redirige a `firmeasy://sign?data=...` y si la app no abre en ~3.5s, redirige a `app-no-instalada.php` (página con botones manuales a Play Store / App Store).
 
 ```javascript
-window.location.href = response.uri;
+window.location.href = "firmeasy://sign?data=" + response.uri_encrypted;
 setTimeout(function() {
   window.location.href = '/app-no-instalada.php';
 }, 3500);
@@ -222,7 +253,7 @@ setTimeout(function() {
 #### Opción B — Timeout JS directo a Play Store (recomendada para web)
 
 ```javascript
-window.location.href = response.uri;
+window.location.href = "firmeasy://sign?data=" + response.uri_encrypted;
 var start = Date.now();
 setTimeout(function() {
   if (Date.now() - start < 2500) {
@@ -238,10 +269,10 @@ Si la app no abrió en 2 segundos, redirige directo a Play Store.
 En vez de usar `firmeasy://`, construir un `intent://` con fallback embebido:
 
 ```
-intent://sign?job=...&nonce=...&exp=...&kid=default&token=...#Intent;scheme=firmeasy;package=com.firmeasy;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.firmeasy;end
+intent://sign?data=BASE64URL_BLOB#Intent;scheme=firmeasy;package=com.firmeasy;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.firmeasy;end
 ```
 
-Android abre la app si está instalada, o va al Play Store automática mente si no lo está.
+Android abre la app si está instalada, o va al Play Store automáticamente si no lo está.
 
 #### Opción D — Android App Links (esquema `https://`)
 
@@ -257,7 +288,7 @@ Requiere registrar `assetlinks.json` en el dominio del backend FirmEasy y config
 
 2. **Nombres de archivo únicos** — Evita colisiones. Usa prefijos: `cliente123_contrato_20240810.pdf`
 
-3. **Red accesible** — El móvil del usuario final debe poder resolver y acceder a `http://10.21.132.143:8081` (misma LAN o VPN / IP pública)
+3. **Red accesible** — El móvil del usuario final debe poder resolver y acceder a `http://<IP>:8081` (misma LAN o VPN / IP pública)
 
 ---
 
@@ -269,7 +300,9 @@ $payload = @{
         signature_type = "basic"
         signature_reason = "Acepto términos y condiciones"
         generate_request = "Mi Empresa S.A.C."
+        certificate_type = "all"
     }
+    token = "TOKEN_USUARIO_FINAL"
     documents = @(
         @{
             file = "contrato_cliente_001.pdf"
@@ -289,11 +322,12 @@ $payload = @{
     )
 } | ConvertTo-Json -Depth 5
 
-$response = Invoke-RestMethod -Uri "http://10.21.132.143:8081/api/generar-uri.php" -Method Post -ContentType "application/json" -Body $payload
+$response = Invoke-RestMethod -Uri "http://<IP>:8081/api/generar-uri.php" -Method Post -ContentType "application/json" -Body $payload
 
 # Redirigir al usuario en el frontend:
-# window.location.href = $response.uri
-Write-Host "URI para deep link: $($response.uri)"
+# window.location.href = "firmeasy://sign?data=" + $response.uri_encrypted
+Write-Host "Deep link: firmeasy://sign?data=$($response.uri_encrypted)"
+Write-Host "Plain (solo depuracion): $($response.uri_plain)"
 ```
 
 ---
@@ -303,6 +337,8 @@ Write-Host "URI para deep link: $($response.uri)"
 ### GET `/api/job/{job_id}`
 
 Devuelve la configuración completa guardada (incluye `from` y `to` URLs).
+
+> **Nota:** este endpoint **NO devuelve `token` ni `exp`** a propósito (seguridad, ver `api/job.php`). El `token` solo viaja dentro del blob cifrado `data` del deep link; la app móvil lo obtiene al descifrar.
 
 ### GET `/api/list-signed.php?original={filename}`
 
@@ -337,8 +373,9 @@ Descarga directa con `Content-Disposition: attachment`.
 
 ## Notas Importantes
 
-- **Expiración:** Jobs expiran a los 10 minutos (`EXPIRACION_SEGUNDOS = 600`). La URI `firmeasy://` no funcionará después.
-- **Nonce single-use:** (Pendiente implementar validación estricta) — Actualmente el nonce no invalida el job tras uso.
+- **Expiración:** Jobs expiran a los 10 minutos (`EXPIRACION_SEGUNDOS = 600`). El blob cifrado no se aceptará después de `exp`.
+- **Cifrado:** El blob usa AES-256-GCM; si el tag no verifica o la clave cambia, la app debe rechazarlo. `ENCRYPTION_KEY` debe ser la misma en backend y app móvil.
+- **Use-once del job:** (Pendiente implementar validación estricta) — hoy un job puede consultarse varias veces con el mismo blob. Próximamente: marcar el job como `consumido` y devolver `410`.
 - **Tamaño máximo PDF:** 20 MB (configurado en `download.php`).
 - **CORS:** Habilitado (`Access-Control-Allow-Origin: *`) para integración desde cualquier origen web.
 

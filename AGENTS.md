@@ -58,17 +58,7 @@ firma-web-movil/
 
 ## 3. Configuración clave (cambiar cuando cambias de red)
 
-La IP del host está referenciada en **3 archivos** que hay que actualizar al cambiar de red:
-
-| Archivo | Línea | Por qué |
-|---|---|---|
-| `docker-compose.yml` | `BASE_URL_EXTERNO=http://<IP>:8081` | Variable de entorno del contenedor |
-| `api/generar-uri.php` | `$BASE_URL_EXTERNO = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://<IP>:8081', '/');` | Fallback si no hay env var |
-| `README.md` | Referencias a `http://<IP>:8081` | Documentación |
-| `index.php` | **NO** — usa rutas relativas (`/api/...`) | No necesita cambio |
-
-**IP actual:** `10.21.132.230` (red "Red 146", perfil **Público**)
-- Cambió de `10.21.132.64` → `10.21.132.230`
+**Estado actual:** `BASE_URL_EXTERNO=http://localhost:8081` — configurado para pruebas en la **misma máquina**. Si necesitas probar el deep link desde un **móvil en la misma LAN**, cambia `localhost` por la IP del host en los 3 archivos de abajo.
 
 **Comandos para verificar IP y puerto:**
 ```powershell
@@ -106,7 +96,7 @@ docker-compose logs -f
 ### Generación de firma
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/api/generar-uri.php` | Crea job, devuelve `{ "uri", "job", "nonce", "exp", "token" }` |
+| POST | `/api/generar-uri.php` | Crea job, devuelve `{ "uri_encrypted", "uri_plain", "job", "exp", "data" }` |
 | GET | `/api/job/{job_id}` | Devuelve config completa del job |
 | GET | `/api/token/{job}` | Legacy — token del job |
 
@@ -131,8 +121,10 @@ docker-compose logs -f
   "configuration": {
     "signature_type": "basic",
     "signature_reason": "Acepto el contenido del documento",
-    "generate_request": "NOMBRE EMPRESA"
+    "generate_request": "NOMBRE EMPRESA",
+    "certificate_type": "all"
   },
+  "token": "TOKEN_USUARIO",
   "documents": [
     {
       "file": "doc_prueba1.pdf",
@@ -141,7 +133,7 @@ docker-compose logs -f
       "settings": {
         "vis_sig_x": 340, "vis_sig_y": 693, "vis_sig_width": 155, "vis_sig_height": 55,
         "vis_sig_page": 1, "vis_sig_text_size": 10,
-        "vis_sig_text": "Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{motivo_firma}}",
+        "vis_sig_text": "Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}",
         "vis_sig_graphic": "http://imagen-firma.com/logo.png"
       }
     }
@@ -150,7 +142,9 @@ docker-compose logs -f
 ```
 
 **Convención de claves (importante):**
-- Claves de primer/segundo nivel en **inglés**: `configuration`, `documents`, `signature_type`, `signature_reason`, `generate_request`, `signature_reason`, `file`, `user_id`, `doc_sha256`, `settings`, `from`, `to`.
+- Claves de primer/segundo nivel en **inglés**: `configuration`, `documents`, `signature_type`, `signature_reason`, `generate_request`, `certificate_type`, `file`, `user_id`, `doc_sha256`, `settings`, `from`, `to`.
+- `token` (string, requerido) — lo provee el usuario final en el modal de la web.
+- `configuration.certificate_type`: `"all"` | `"dni"` | `"certificado"` (default `"all"`).
 - Claves de `settings` (3er nivel): **`vis_sig_*` en inglés** — NO cambiar (los consume la app móvil FirmEasy; cambiarlos rompería la integración).
 - Los **valores** (textos, placeholders `<SIGNER>`/`<DATE>`/`<OU>`) pueden estar en español.
 - Los `storage/jobs/*.json` viejos usaban claves en español (`configuracion`, `documentos`, `tipo_firma`) — son históricos, no se modifican.
@@ -165,24 +159,27 @@ docker-compose logs -f
 ## 6. Flujo completo de firma
 
 1. Usuario abre `http://<IP>:8081/` en el navegador → ve la tabla de documentos (o cards en móvil)
-2. Pulsa **Firmar** en un documento → `index.php` hace `POST /api/generar-uri.php`
-3. El backend genera `job` (UUID v4) + `nonce` + `exp` (10 min) + `token`, guarda `storage/jobs/{job}.json`, y devuelve la URI completa `firmeasy://sign?job=...&nonce=...&exp=...&kid=default&token=...`
+2. Pulsa **Firmar** en un documento → modal pide **Token** y **Tipo de certificado** → `index.php` hace `POST /api/generar-uri.php`
+3. El backend genera `job` (UUID v4) + `exp` (10 min) + `token`, guarda `storage/jobs/{job}.json`, y **cifra la URI completa con AES-256-GCM** → devuelve `firmeasy://sign?data=<BASE64URL_BLOB>`
 4. El navegador dispara el deep link → abre la app móvil FirmEasy
-5. La app móvil consulta `GET /api/job/{job}` para obtener `from` (URL de descarga del PDF) y `to` (URL de subida del PDF firmado)
+5. La app móvil **descifra el blob** (clave `ENCRYPTION_KEY`) → obtiene `job` + `exp` + `token`; consulta `GET /api/job/{job}` para `from` (descarga PDF) y `to` (subida PDF firmado)
 6. La app móvil firma el PDF y lo **sube en BINARIO** a `/api/upload-signed.php?file={nombre}&user_id={id}`
 7. El backend lo guarda en `document/signed/{base}_{user_id}.pdf`
 8. Al volver a la web, la lista se recarga y el documento pasa de **Pendiente → Firmado**, aparece el botón **Ver PDF firmado**
 9. Si quiere empezar de cero, pulsa **Actualizar** → `clear-signed.php` elimina todos los firmados → recarga la lista
 
-### Parámetros del deep link
+### Deep link y cifrado (AES-256-GCM)
 
-```
-firmeasy://sign?job={URL_ENCODED_DE_GET_/api/job/{job}}&nonce={hex_32}&exp={unix_ts}&kid=default&token=tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT
-```
+El deep link final es `firmeasy://sign?data=<BASE64URL_BLOB>` — **todo** (data/job, exp, token) viaja cifrado, no hay parámetros en claro.
 
-**Tokens/constantes fijas (hardcodeadas por ahora):**
-- `KID = 'default'`
-- `TOKEN_FIJO = 'tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT'`
+- **Algoritmo:** AES-256-GCM
+- **Formato blob:** `base64url( IV(12 bytes) || CIPHERTEXT || TAG(16 bytes) )`
+- **Clave:** `ENCRYPTION_KEY` (base64 de 32 bytes), compartida backend ↔ app móvil
+- **Contenido descifrado:** `firmeasy://sign?data={URL_ENCODED_DE_GET_/api/job/{job}}&exp={unix_ts}&token={token_del_usuario}`
+
+**Validaciones de la app móvil al descifrar:** verificar `exp` (`exp < time()` → rechazar), hacer `GET {data}` (URL decodificada) para obtener `from`/`to`, descargar PDF de `from`, firmar y subir a `to`.
+
+**Constantes fijas:**
 - `EXPIRACION_SEGUNDOS = 600` (10 min)
 
 ---
@@ -199,7 +196,7 @@ firmeasy://sign?job={URL_ENCODED_DE_GET_/api/job/{job}}&nonce={hex_32}&exp={unix
 
 **Botones por documento:**
 - **Ver PDF** (gris) → abre `/api/download.php?file=...` en nueva pestaña (descarga directa con `Content-Disposition: attachment`)
-- **Firmar** (azul `#0066cc`) → llama a `/api/generar-uri.php` y dispara deep link
+- **Firmar** (azul `#0066cc`) → abre modal pidiendo **Token** + **Tipo de certificado** (`all`/`dni`/`certificado`), llama a `/api/generar-uri.php` y dispara deep link
 - **Ver PDF firmado** (verde `#28a745`, solo habilitado si ya existe) → abre `/api/download-signed.php?file=...`
 
 **Botón Actualizar:**
@@ -277,15 +274,15 @@ netsh advfirewall firewall show rule name="FirmEasy Web (Puerto 8081)"
 
 **Pendiente para el modelo SaaS:**
 - **API Keys por cliente** — hoy cualquiera puede llamar a `/api/generar-uri.php` sin autenticación. Necesario para facturación/auditoría.
-- **Validación estricta del `nonce`** (invalidación use-once) — hoje `nonce` se genera pero no se valida en `job.php`. Implementación futura: marcar job como `consumido` tras el primer uso, devolver `410` si se reintenta.
+- **Validación estricta del `data` cifrado (invalidación use-once)** — hoy un job puede consultarse varias veces con el mismo blob. Implementación futura: marcar job como `consumido` tras el primer uso, devolver `410` si se reintenta.
 
 ---
 
 ## 11. Tareas pendientes / TODOs conocidos
 
 - [ ] Implementar **API Keys por cliente** para multi-tenancy (SaaS)
-- [ ] Implementar **invalidación use-once del nonce** en `job.php` / `download.php`
-- [ ] Actualizar `{{motivo_firma}}` → `{{signature_reason}}` en `test_payload.json`, `ejemplo.json`, `index.php` (la clave cambió de nombre, la plantilla del texto sigue referenciando la vieja)
+- [ ] Implementar **invalidación use-once del job** en `job.php` / `download.php` (devolver `410` tras el primer consumo)
+- [ ] Probar la **firma real** con la app móvil FirmEasy (deep link `firmeasy://sign?data=...`) — requiere que el móvil alcance el backend por LAN (cambiar `localhost` por la IP en `BASE_URL_EXTERNO`)
 - [ ] Considerar renombrar placeholders `<SIGNER>`/`<DATE>`/`<OU>` → `<FIRMANTE>`/`<FECHA>`/`<OU>` en `vis_sig_text` (requiere coordinar con la app móvil)
 - [ ] Eliminar endpoints legacy (`generar-job.php`, `token.php`) si ya no se usan
 
@@ -323,5 +320,5 @@ Invoke-RestMethod -Uri "http://localhost:8081/api/upload-signed.php?file=doc_pru
 - **`test.pdf`** es un PDF fake de 25 bytes (`%PDF-1.4 fake pdf content`). No es un PDF válido real — solo está para pruebas. Déjalo a menos que se pida lo contrario.
 - **Docker Desktop** en Windows expone correctamente los puertos publicados en `0.0.0.0`, así que el contenedor es accesible desde la LAN.
 - **Volumen bind** (`./:/var/www/html`) — los cambios en archivos se reflejan al instante; solo los cambios en `docker/nginx.conf` requieren `docker-compose restart`.
-- **No hay `.git`** en el directorio (no es un repo git todavía).
+- **Repositorio git:** sí hay `.git`, rama activa `firma-integracion`.
 - El puerto 8081 está en uso por `com.docker.backend.exe` (Docker) — es este contenedor.

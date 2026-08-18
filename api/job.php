@@ -104,7 +104,8 @@ if (isset($jobData['exp']) && $jobData['exp'] < time()) {
 }
 
 // Ocultar campos internos en la respuesta
-unset($jobData['nonce'], $jobData['exp'], $jobData['kid'], $jobData['token'], $jobData['created_at'], $jobData['token_url']);
+// exp y token NO se retornan - la app móvil los obtiene del blob descifrado
+unset($jobData['exp'], $jobData['token'], $jobData['nonce'], $jobData['kid'], $jobData['created_at']);
 
 // Devolver configuración completa
 header('Content-Type: application/json; charset=utf-8');

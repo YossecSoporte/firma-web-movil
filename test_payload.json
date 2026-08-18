@@ -10,7 +10,8 @@
     {
       "file": "doc_prueba1.pdf",
       "user_id": "USER123",
-      "doc_sha256": "",
+      "doc_sha256": "D5076E6E6AB7062B8FD7380E1E105214D482FA0876B2ABC9B1A2BADC0D4585D4",
+      "data": "https://raw.githubusercontent.com/YossecSoporte/DOC-PDF/main/doc_prueba1.pdf",
       "settings": {
         "vis_sig_x": 340,
         "vis_sig_y": 693,
@@ -18,7 +19,7 @@
         "vis_sig_height": 55,
         "vis_sig_page": 1,
         "vis_sig_text_size": 10,
-        "vis_sig_text": "Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{motivo_firma}}",
+        "vis_sig_text": "Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}",
         "vis_sig_graphic": "http://imagen-firma.com/logo.png"
       }
     }

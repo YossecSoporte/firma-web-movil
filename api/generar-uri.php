@@ -114,7 +114,17 @@ if (!in_array($certificateType, ['all', 'dni', 'certificado'], true)) {
 $doc = $data['documents'][0]; // Solo el primer documento
 
 // Validar campos requeridos del documento
-$required = ['file', 'user_id', 'settings'];
+// 'data' es opcional - si se provee, 'file' no es requerido (el PDF puede ser remoto)
+$hasDataUrl = isset($doc['data']) && !empty($doc['data']);
+
+if ($hasDataUrl) {
+    // Con 'data' personalizada, solo se necesita user_id y settings
+    $required = ['user_id', 'settings'];
+} else {
+    // Sin 'data', se necesita file (local) y settings
+    $required = ['file', 'user_id', 'settings'];
+}
+
 foreach ($required as $field) {
     if (!isset($doc[$field])) {
         http_response_code(400);
@@ -123,30 +133,43 @@ foreach ($required as $field) {
     }
 }
 
-$fileName = basename($doc['file']);
+$fileName = isset($doc['file']) ? basename($doc['file']) : '';
 $userId = $doc['user_id'];
 
-// Validar que el archivo existe en document/
-$filePath = __DIR__ . '/../document/' . $fileName;
-if (!file_exists($filePath)) {
-    http_response_code(404);
-    echo json_encode(['error' => "Archivo no encontrado en document/: $fileName"]);
-    exit;
-}
+// Si hay 'data' personalizada, usar esa URL; si no, usar el endpoint estándar
+$dataUrl = $hasDataUrl ? $doc['data'] : '';
 
-// Calcular doc_sha256 si no viene
-$docSha256 = $doc['doc_sha256'] ?? '';
-if (empty($docSha256)) {
-    $docSha256 = hash_file('sha256', $filePath);
-    if ($docSha256 === false) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Error calculando SHA-256 del PDF']);
+// Si no hay 'data' personalizada, validar que el archivo existe localmente
+if (!$hasDataUrl) {
+    $filePath = __DIR__ . '/../document/' . $fileName;
+    if (!file_exists($filePath)) {
+        http_response_code(404);
+        echo json_encode(['error' => "Archivo no encontrado en document/: $fileName"]);
         exit;
     }
-} elseif (!preg_match('/^[a-f0-9]{64}$/i', $docSha256)) {
-    http_response_code(400);
-    echo json_encode(['error' => 'doc_sha256 debe ser 64 caracteres hexadecimales']);
-    exit;
+
+    // Calcular doc_sha256 si no viene
+    $docSha256 = $doc['doc_sha256'] ?? '';
+    if (empty($docSha256)) {
+        $docSha256 = hash_file('sha256', $filePath);
+        if ($docSha256 === false) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Error calculando SHA-256 del PDF']);
+            exit;
+        }
+    } elseif (!preg_match('/^[a-f0-9]{64}$/i', $docSha256)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'doc_sha256 debe ser 64 caracteres hexadecimales']);
+        exit;
+    }
+} else {
+    // Con 'data' personalizada, usar doc_sha256 del request si viene, o vacío
+    $docSha256 = $doc['doc_sha256'] ?? '';
+    if (!empty($docSha256) && !preg_match('/^[a-f0-9]{64}$/i', $docSha256)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'doc_sha256 debe ser 64 caracteres hexadecimales']);
+        exit;
+    }
 }
 
 // Construir URLs completas hacia el sistema externo
@@ -183,8 +206,14 @@ if (!file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHE
 }
 
 // Construir URI plano (sin nonce, sin kid)
-$jobUrl = $BASE_URL_EXTERNO . '/api/job/' . $job;
-$plainUri = "firmeasy://sign?job=" . rawurlencode($jobUrl) . "&exp=$exp&token=" . rawurlencode($userToken);
+// Formato: firmeasy://sign?data={DATA_URL}&exp={TS}&token={USER_TOKEN}
+// Si el cliente provee 'data' personalizada, usarla; si no, usar el endpoint estándar
+if (!empty($dataUrl)) {
+    $deepDataUrl = $dataUrl;
+} else {
+    $deepDataUrl = $BASE_URL_EXTERNO . '/api/job/' . $job;
+}
+$plainUri = "firmeasy://sign?data=" . rawurlencode($deepDataUrl) . "&exp=$exp&token=" . rawurlencode($userToken);
 
 // Encriptar URI completa
 $encryptedBlob = encryptUri($plainUri, $ENCRYPTION_KEY);

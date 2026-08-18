@@ -66,6 +66,8 @@
     .btn-sign:hover:not(:disabled) { background: #0052a3; }
     .btn-view-signed { background: #28a745; color: #fff; }
     .btn-view-signed:hover:not(:disabled) { background: #218838; }
+    .btn-sign-github { background: #6f42c1; color: #fff; }
+    .btn-sign-github:hover:not(:disabled) { background: #5a32a3; }
     .btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
 
     /* ===== Cards (móvil) ===== */
@@ -303,6 +305,7 @@
               + '<td><div class="actions">'
               +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
               +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
+              +   '<button class="btn-action btn-sign-github" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar (GitHub)</button>'
               +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver firmado</button>')
@@ -324,6 +327,7 @@
               + '<div class="dc-actions">'
               +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
               +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
+              +   '<button class="btn-action btn-sign-github" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar (GitHub)</button>'
               +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver PDF firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver PDF firmado</button>')
@@ -333,6 +337,11 @@
           // Listeners Firmar (ambas vistas)
           document.querySelectorAll('.btn-sign').forEach(function(btn) {
             btn.addEventListener('click', function() { openApp(btn); });
+          });
+
+          // Listeners Firmar GitHub (ambas vistas)
+          document.querySelectorAll('.btn-sign-github').forEach(function(btn) {
+            btn.addEventListener('click', function() { openAppGitHub(btn); });
           });
 
         } catch (err) {
@@ -371,6 +380,7 @@
 
       // ===== FIRMAR =====
       let pendingFile = null;
+      let pendingFileGitHub = null;
 
       function showSignModal(file) {
         pendingFile = file;
@@ -380,9 +390,18 @@
         document.getElementById('modalToken').focus();
       }
 
+      function showSignModalGitHub(file) {
+        pendingFileGitHub = file;
+        document.getElementById('modalToken').value = '';
+        document.getElementById('modalCertType').value = 'all';
+        document.getElementById('signModal').classList.add('open');
+        document.getElementById('modalToken').focus();
+      }
+
       function hideSignModal() {
         document.getElementById('signModal').classList.remove('open');
         pendingFile = null;
+        pendingFileGitHub = null;
       }
 
       document.getElementById('modalCancel').addEventListener('click', hideSignModal);
@@ -393,9 +412,15 @@
           showStatus('Token requerido', 'error');
           return;
         }
-        const file = pendingFile;
-        hideSignModal();
-        await doSign(file, token, certificateType);
+        if (pendingFileGitHub) {
+          const file = pendingFileGitHub;
+          hideSignModal();
+          await doSignGitHub(file, token, certificateType);
+        } else {
+          const file = pendingFile;
+          hideSignModal();
+          await doSign(file, token, certificateType);
+        }
       });
 
       // Cerrar modal con Escape
@@ -429,7 +454,7 @@
                 settings: {
                   vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
                   vis_sig_page: 1, vis_sig_text_size: 10,
-                  vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{motivo_firma}}',
+                  vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}',
                   vis_sig_graphic: 'http://imagen-firma.com/logo.png'
                 }
               }]
@@ -491,11 +516,110 @@
         }, { once: true });
       }
 
+      // ===== FIRMAR GITHUB =====
+      async function doSignGitHub(selectedFile, userToken, certificateType) {
+        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
+
+        const GITHUB_DATA_URL = 'https://raw.githubusercontent.com/YossecSoporte/DOC-PDF/main/doc_prueba1.pdf';
+
+        const btn = document.querySelector('.btn-sign-github[data-file="' + escapeAttr(selectedFile) + '"]');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
+        showStatus('Obteniendo URI de firma (GitHub) para ' + selectedFile + '...', 'info');
+
+        let data;
+        try {
+          const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              configuration: {
+                signature_type: 'basic',
+                signature_reason: 'Acepto el contenido del documento',
+                generate_request: 'NOMBRE EMPRESA',
+                certificate_type: certificateType
+              },
+              token: userToken,
+              documents: [{
+                file: selectedFile, user_id: 'USER123', doc_sha256: '',
+                data: GITHUB_DATA_URL,
+                settings: {
+                  vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
+                  vis_sig_page: 1, vis_sig_text_size: 10,
+                  vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}',
+                  vis_sig_graphic: 'http://imagen-firma.com/logo.png'
+                }
+              }]
+            }),
+            credentials: 'same-origin'
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || 'HTTP ' + resp.status);
+          }
+          data = await resp.json();
+        } catch (err) {
+          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
+          return;
+        }
+
+        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+
+        // Usar URI encriptada para el deep link: firmeasy://sign?data=BLOB
+        const encryptedBlob = data.uri_encrypted || data.data;
+        const deepLink = 'firmeasy://sign?data=' + encodeURIComponent(encryptedBlob);
+
+        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
+        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        deepLinkDisplay.style.display = 'block';
+
+        console.log('=== FIRMEASY DEEP LINK (GITHUB) ===');
+        console.log('Encrypted:', deepLink);
+        console.log('Plain:', data.uri_plain);
+
+        showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + ' (GitHub)...', 'info');
+
+        const start = Date.now();
+        let fallbackTriggered = false;
+        const timer = setTimeout(function () {
+          if (fallbackTriggered) return;
+          if (Date.now() - start < VISIBILITY_GRACE_MS && document.visibilityState === 'visible') {
+            fallbackTriggered = true;
+            window.location.href = FALLBACK_URL;
+          }
+        }, FALLBACK_DELAY_MS);
+
+        function cancelFallback() {
+          if (!fallbackTriggered) { clearTimeout(timer); fallbackTriggered = true; }
+        }
+        document.addEventListener('visibilitychange', function onVis() {
+          if (document.visibilityState === 'hidden') cancelFallback();
+        }, { once: true });
+        window.addEventListener('pagehide', cancelFallback, { once: true });
+        window.addEventListener('blur', cancelFallback, { once: true });
+
+        window.location.href = deepLink;
+
+        // Recargar al volver (la app ya subió el PDF)
+        window.addEventListener('focus', function onBack() {
+          window.removeEventListener('focus', onBack);
+          setTimeout(loadPdfList, 2000);
+        }, { once: true });
+      }
+
       // Wrapper para mantener compatibilidad con onclick directo
       async function openApp(btn) {
         const selectedFile = btn.getAttribute('data-file');
         if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
         showSignModal(selectedFile);
+      }
+
+      // Wrapper para Firmar con URL de GitHub
+      async function openAppGitHub(btn) {
+        const selectedFile = btn.getAttribute('data-file');
+        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
+        showSignModalGitHub(selectedFile);
       }
 
       // ===== INIT =====

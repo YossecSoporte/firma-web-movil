@@ -18,7 +18,7 @@
         "vis_sig_height": 55,
         "vis_sig_page": 1,
         "vis_sig_text_size": 10,
-        "vis_sig_text": "Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{motivo_firma}}",
+        "vis_sig_text": "Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}",
         "vis_sig_graphic": "http://imagen-firma.com/logo.png"
       }
     }

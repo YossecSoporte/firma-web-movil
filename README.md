@@ -1,30 +1,40 @@
-# FirmEasy Web - Deep Link Launcher
+# FirmEasy Web — Deep Link Launcher
 
-Página web (PHP + Nginx) que genera un job de firma y lanza la app móvil FirmEasy mediante deep link `firmeasy://`.
+Página web (PHP + Nginx en Docker) que genera jobs de firma y lanza la app móvil FirmEasy mediante deep link cifrado `firmeasy://sign?data=BLOB`.
 
 ## Estructura
 
 ```
-.
-├── index.php              # Página principal con botón de firma + modal token/certificado
-├── app-no-instalada.php   # Fallback si la app no está instalada
-├── docker-compose.yml     # Orquestación Docker (puerto host 8081)
-├── Dockerfile             # Imagen PHP-FPM + Nginx + Supervisor
+firma-web-movil/
+├── index.php                  # Frontend principal (tabla responsive de documentos)
+├── app-no-instalada.php       # Fallback si la app móvil no está instalada
+├── docker-compose.yml         # Orquestación Docker (puerto 8081:80)
+├── Dockerfile                 # Imagen PHP-FPM + Nginx + Supervisor (Alpine)
 ├── docker/
-│   ├── nginx.conf         # Configuración Nginx (rutas API + PHP-FPM)
-│   ├── supervisord.conf   # Supervisor para PHP-FPM + Nginx
-│   └── php.ini            # Configuración PHP
+│   ├── nginx.conf             # Configuración Nginx (rutas API)
+│   ├── supervisord.conf       # Supervisor para PHP-FPM + Nginx
+│   └── php.ini                # Configuración PHP
 ├── api/
-│   ├── generar-uri.php    # POST: crea el job y devuelve URI encriptada
-│   ├── job.php            # GET /api/job/{job}: devuelve la config del job
-│   ├── token.php          # GET /api/token/{job}: legacy, token del job
-│   ├── generar-job.php    # Legacy (ya no lo usa el frontend)
-│   ├── list-pdfs.php      # GET: lista PDFs en document/
-│   └── download.php       # GET: descarga un PDF de document/ con seguridad
-├── storage/jobs/          # Jobs en JSON (sin base de datos)
-├── document/              # PDFs a firmar
-├── test_payload.json      # Payload de prueba para POST /api/generar-uri.php
-��── ejemplo.json           # Ejemplo de payload
+│   ├── generar-uri.php        # POST: crea job y devuelve URI firmeasy:// completa
+│   ├── job.php                # GET /api/job/{job}: devuelve config del job
+│   ├── token.php              # GET /api/token/{job}: legacy
+│   ├── generar-job.php        # Legacy (no lo usa el frontend)
+│   ├── list-pdfs.php          # GET: lista PDFs originales en document/
+│   ├── download.php           # GET: descarga PDF original
+│   ├── upload-signed.php      # POST: recibe PDF firmado en BINARIO
+│   ├── list-signed.php        # GET: lista PDFs firmados en document/signed/
+│   ├── download-signed.php    # GET: descarga PDF firmado
+│   └── clear-signed.php       # POST: elimina todos los PDFs firmados
+├── document/                 # PDFs originales a firmar
+│   ├── doc_prueba1.pdf
+│   ├── doc_prueba2.pdf
+│   └── test.pdf               # PDF fake de prueba
+├── document/signed/           # PDFs firmados subidos por la app móvil
+├── storage/jobs/              # Jobs en JSON (uno por archivo {uuid}.json)
+├── test_payload.json          # Payload de prueba para POST /api/generar-uri.php
+├── INTEGRACION_API.md         # Documentación de integración para backends externos
+├── INTEGRACION_COMPLETA.md    # Guía completa de integración
+└── README_programador.md      # Documentación técnica para app móvil
 ```
 
 ## Producción con Docker
@@ -44,28 +54,36 @@ La web queda en `http://localhost:8081` (accesible desde el móvil en la misma r
 
 ### Variables de entorno
 
-- `BASE_URL_EXTERNO`: base URL que la app móvil usará para consultar el job y descargar/ subir PDFs. Debe apuntar a este mismo servicio (ej. `http://localhost:8081`) o al backend externo si fuera el caso. Si no se define, `generar-uri.php` usa como fallback `http://localhost:8081`.
-- `ENCRYPTION_KEY`: clave base64 de 32 bytes para encriptar la URI completa con AES-256-GCM. **Requerida**. Generar con: `openssl rand -base64 32`
+| Variable | Descripción | Ejemplo |
+|---|---|---|
+| `BASE_URL_EXTERNO` | URL base que la app móvil usará para consultar el job | `http://localhost:8081` |
+| `ENCRYPTION_KEY` | Clave base64 de 32 bytes para AES-256-GCM | Generar con `openssl rand -base64 32` |
 
-## Flujo
+## Flujo de Firma
 
-1. Usuario abre `http://localhost:8081/` en el navegador móvil
-2. Selecciona un PDF (se lista desde `/api/list-pdfs.php`)
-3. Toca "Firmar" → se abre modal pidiendo **Token** y **Tipo de certificado** (all/dni/certificado)
-4. Al confirmar, `index.php` hace `POST /api/generar-uri.php` con `token` y `certificate_type`
-5. El API valida el archivo en `document/`, calcula `doc_sha256`, genera `job` (UUID v4) + `exp` (10 min), guarda `storage/jobs/{job}.json`
-6. Construye URI plano: `firmeasy://sign?job={jobUrl}&exp={exp}&token={userToken}`
-7. Encripta la URI completa con AES-256-GCM → blob base64url(IV||CT||TAG)
-8. Devuelve `{ "uri_encrypted": "blob", "uri_plain": "...", "job": "...", "exp": ..., "data": "blob" }`
-9. Frontend construye deep link final: `firmeasy://sign?data=BLOB`
-10. El navegador dispara el deep link
-11. La app móvil descifra el blob, extrae `job`, `exp`, `token`, consulta `GET /api/job/{job}` para obtener `from` y `to`, y procede con la firma
+```
+1. Usuario abre http://localhost:8081/ en el navegador
+2. Selecciona un PDF (se lista desde /api/list-pdfs.php)
+3. Toca "Firmar" → modal pide Token y Tipo de certificado
+4. Frontend hace POST /api/generar-uri.php
+5. Backend genera job (UUID v4) + exp (10 min) + guarda JSON
+6. Backend cifra URI completa con AES-256-GCM
+7. Backend retorna uri_encrypted (blob)
+8. Frontend construye deep link: firmeasy://sign?data={BLOB}
+9. Navegador dispara deep link → abre app móvil
+10. App móvil descifra blob, obtiene job/exp/token
+11. App móvil hace GET /api/job/{job} para obtener from/to
+12. App móvil descarga PDF, firma, sube a /api/upload-signed.php
+13. Al volver a la web, lista se refresca (Pendiente → Firmado)
+```
 
 ## API
 
 ### POST /api/generar-uri.php
 
-Body:
+Crea job y retorna URI cifrada.
+
+**Request:**
 
 ```json
 {
@@ -75,29 +93,35 @@ Body:
     "generate_request": "NOMBRE EMPRESA",
     "certificate_type": "all"
   },
-  "token": "TOKEN_USUARIO_REQUERIDO",
+  "token": "TOKEN_USUARIO",
   "documents": [
     {
-      "file": "doc_prueba1.pdf",
+      "file": "documento.pdf",
       "user_id": "USER123",
       "doc_sha256": "",
-      "settings": { "vis_sig_x": 340 }
+      "settings": {
+        "vis_sig_x": 340,
+        "vis_sig_y": 693,
+        "vis_sig_width": 155,
+        "vis_sig_height": 55,
+        "vis_sig_page": 1,
+        "vis_sig_text_size": 10,
+        "vis_sig_text": "Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}",
+        "vis_sig_graphic": "http://imagen-firma.com/logo.png"
+      }
     }
   ]
 }
 ```
 
-- `configuration.certificate_type`: `"all"` | `"dni"` | `"certificado"` (default: `"all"`)
-- `token`: string, requerido, lo provee el usuario en la UI
-
-Respuesta:
+**Response:**
 
 ```json
 {
   "uri_encrypted": "BASE64URL_BLOB",
-  "uri_plain": "firmeasy://sign?job=...&exp=...&token=...",
+  "uri_plain": "firmeasy://sign?data=http%3A%2F%2Flocalhost%3A8081%2Fapi%2Fjob%2F{uuid}&exp={ts}&token={token}",
   "job": "uuid-v4",
-  "exp": 1786664133,
+  "exp": 1786978911,
   "data": "BASE64URL_BLOB"
 }
 ```
@@ -106,45 +130,34 @@ Respuesta:
 
 ### GET /api/job/{job}
 
-Devuelve la configuración completa del job (con `from`, `to`, `doc_sha256`, `settings`, `configuration.certificate_type`).
-Errores: `404` no existe, `410` expirado.
+Devuelve la configuración completa del job (con `from`, `to`, `doc_sha256`, `settings`).
 
 ### GET /api/download.php?file={archivo.pdf}
 
-Descarga segura del PDF (bloquea path traversal, solo `.pdf`, máximo 20 MB, soporta ranges).
+Descarga segura del PDF (bloquea path traversal, solo `.pdf`, máximo 20 MB).
 
-### GET /api/list-pdfs.php
+### POST /api/upload-signed.php?file={archivo.pdf}&user_id={id}
 
-Lista los PDFs de `document/` ordenados por fecha de modificación.
+Recibe el PDF firmado en binario (`php://input`).
 
-## Encriptación (para app móvil)
+### GET /api/list-signed.php
+
+Lista PDFs firmados. Filtro opcional: `?original={archivo.pdf}`.
+
+### POST /api/clear-signed.php?confirm=1
+
+Elimina todos los PDFs firmados.
+
+## Encriptación (AES-256-GCM)
 
 **Algoritmo:** AES-256-GCM
 **Formato blob:** `base64url( IV(12 bytes) || CIPHERTEXT || TAG(16 bytes) )`
 **Clave:** `ENCRYPTION_KEY` (base64, 32 bytes) - misma en backend y app móvil
 
-**Descifrado (pseudocódigo):**
-```kotlin
-// Kotlin
-val decoded = Base64.getUrlDecoder().decode(blob)
-val iv = decoded.copyOfRange(0, 12)
-val tag = decoded.copyOfRange(decoded.size - 16, decoded.size)
-val ct = decoded.copyOfRange(12, decoded.size - 16)
-val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
-val plaintext = cipher.doFinal(ct + tag)
-// plaintext = "firmeasy://sign?job=...&exp=...&token=..."
-```
+**Contenido del blob descifrado:**
 
-```csharp
-// C#
-var decoded = Base64UrlDecode(blob);
-var iv = decoded[..12];
-var tag = decoded[^16..];
-var ct = decoded[12..^16];
-var aes = new AesGcm(key);
-var plaintext = new byte[ct.Length];
-aes.Decrypt(iv, ct, tag, plaintext);
+```
+firmeasy://sign?data={JOB_URL_ENCODED}&exp={UNIX_TS}&token={USER_TOKEN}
 ```
 
 ## Prueba rápida
@@ -156,7 +169,7 @@ openssl rand -base64 32
 # Levantar con la key en docker-compose.yml
 docker-compose up -d --build
 
-# Generar job + URI (desde Windows PowerShell)
+# Generar job + URI
 $body = Get-Content test_payload.json -Raw
 Invoke-RestMethod -Uri "http://localhost:8081/api/generar-uri.php" -Method Post `
   -ContentType "application/json" -Body $body
@@ -165,9 +178,15 @@ Invoke-RestMethod -Uri "http://localhost:8081/api/generar-uri.php" -Method Post 
 Invoke-RestMethod -Uri "http://localhost:8081/api/job/{JOB_ID}"
 ```
 
+## Documentación
+
+- **[INTEGRACION_COMPLETA.md](INTEGRACION_COMPLETA.md)** — Guía completa de integración para desarrolladores
+- **[INTEGRACION_API.md](INTEGRACION_API.md)** — Documentación de la API para backends externos
+- **[README_programador.md](README_programador.md)** — Documentación técnica para la app móvil
+
 ## Requisitos
 
 - Docker 20.10+ / Docker Compose 2.0+
-- Móvil en la misma red que el host (para probar el deep link)
-- App FirmEasy instalada en el móvil para probar la firma real
-- Abrir el puerto 8081 en el firewall de Windows: `abrir_puerto_8081.bat`
+- Puerto 8081 disponible
+- (Opcional) App FirmEasy instalada para pruebas reales
+- Abrir puerto 8081 en firewall: `abrir_puerto_8081.bat` (Windows)
