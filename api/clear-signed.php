@@ -22,6 +22,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
     exit;
 }
 
+$useBlob = !empty(getenv('BLOB_READ_WRITE_TOKEN'));
+if ($useBlob) {
+    require_once __DIR__ . '/_lib/store.php';
+    $deleted = blobDeletePrefix('signed/');
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => true,
+        'deleted' => $deleted
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $signedDir = realpath(__DIR__ . '/../document/signed');
 if ($signedDir === false) {
     header('Content-Type: application/json; charset=utf-8');

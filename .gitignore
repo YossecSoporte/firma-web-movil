@@ -11,6 +11,10 @@ document/signed/*
 docker-compose.override.yml
 *.local
 
+# Vercel
+.vercel/
+vendor/
+
 # Sistema / editor
 .DS_Store
 Thumbs.db

@@ -20,7 +20,13 @@
  * }
  */
 
-$signedDir = realpath(__DIR__ . '/../document/signed');
+$useBlob = !empty(getenv('BLOB_READ_WRITE_TOKEN'));
+if ($useBlob) {
+    require_once __DIR__ . '/_lib/store.php';
+    $signedDir = null;
+} else {
+    $signedDir = realpath(__DIR__ . '/../document/signed');
+}
 
 // CORS
 header('Access-Control-Allow-Origin: *');
@@ -38,41 +44,55 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-if ($signedDir === false || !is_dir($signedDir)) {
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['success' => true, 'count' => 0, 'files' => []], JSON_UNESCAPED_SLASHES);
-    exit;
-}
-
 // Filtro opcional por nombre original
 $originalFilter = $_GET['original'] ?? '';
 
 $files = [];
-$iterator = new DirectoryIterator($signedDir);
-foreach ($iterator as $fileInfo) {
-    if ($fileInfo->isFile() && preg_match('/\.pdf$/i', $fileInfo->getFilename()) && !$fileInfo->isDot()) {
-        // Saltar .gitkeep u otros no-PDF
-        if ($fileInfo->getFilename() === '.gitkeep') continue;
 
-        $filename = $fileInfo->getFilename();
+if ($useBlob) {
+    $blobs = blobList('signed/');
+    foreach ($blobs as $blob) {
+        $filename = basename($blob['pathname']);
+        if (!preg_match('/\.pdf$/i', $filename)) continue;
 
-        // Aplicar filtro si se pasó el parámetro "original"
-        // Un archivo firmado se llama {base}_{user_id}.pdf, donde base viene del original sin .pdf
         if ($originalFilter !== '') {
             $baseOriginal = preg_replace('/\.pdf$/i', '', $originalFilter);
-            // Verificar si este archivo firmado corresponde al filtro
-            // Formato: {baseOriginal}_{user_id}.pdf
-            if (!str_starts_with($filename, $baseOriginal . '_')) {
-                continue;
-            }
+            if (!str_starts_with($filename, $baseOriginal . '_')) continue;
         }
 
         $files[] = [
             'filename' => $filename,
-            'size'     => $fileInfo->getSize(),
-            'modified' => $fileInfo->getMTime(),
+            'size'     => $blob['size'],
+            'modified' => 0,
             'url'      => '/api/download-signed.php?file=' . rawurlencode($filename),
         ];
+    }
+} else {
+    if ($signedDir === false || !is_dir($signedDir)) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true, 'count' => 0, 'files' => []], JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $iterator = new DirectoryIterator($signedDir);
+    foreach ($iterator as $fileInfo) {
+        if ($fileInfo->isFile() && preg_match('/\.pdf$/i', $fileInfo->getFilename()) && !$fileInfo->isDot()) {
+            if ($fileInfo->getFilename() === '.gitkeep') continue;
+
+            $filename = $fileInfo->getFilename();
+
+            if ($originalFilter !== '') {
+                $baseOriginal = preg_replace('/\.pdf$/i', '', $originalFilter);
+                if (!str_starts_with($filename, $baseOriginal . '_')) continue;
+            }
+
+            $files[] = [
+                'filename' => $filename,
+                'size'     => $fileInfo->getSize(),
+                'modified' => $fileInfo->getMTime(),
+                'url'      => '/api/download-signed.php?file=' . rawurlencode($filename),
+            ];
+        }
     }
 }
 

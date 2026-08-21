@@ -1,0 +1,14 @@
+{
+  "name": "firma-web-movil",
+  "version": "1.0.0",
+  "description": "FirmEasy Web — backend PHP para firma digital móvil",
+  "require": {
+    "php": ">=8.1",
+    "ext-openssl": "*",
+    "ext-curl": "*",
+    "ext-json": "*"
+  },
+  "config": {
+    "optimize-autoloader": true
+  }
+}

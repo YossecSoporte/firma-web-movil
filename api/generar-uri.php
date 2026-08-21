@@ -232,9 +232,16 @@ $jobData = [
     'created_at' => time()
 ];
 
-// Guardar en archivo JSON
-$storageFile = STORAGE_DIR . '/' . $job . '.json';
-if (!file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
+// Guardar job — Vercel Blob o disco local
+$jobJson = json_encode($jobData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+if (!empty(getenv('BLOB_READ_WRITE_TOKEN'))) {
+    require_once __DIR__ . '/_lib/store.php';
+    $saved = blobPut('jobs/' . $job . '.json', $jobJson, ['contentType' => 'application/json']);
+} else {
+    $storageFile = STORAGE_DIR . '/' . $job . '.json';
+    $saved = file_put_contents($storageFile, $jobJson) !== false;
+}
+if (!$saved) {
     http_response_code(500);
     echo json_encode(['error' => 'Error guardando job en almacenamiento']);
     exit;

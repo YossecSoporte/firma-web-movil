@@ -47,19 +47,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Configuración
-$signedDir = realpath(__DIR__ . '/../document/signed');
-if ($signedDir === false) {
-    // Crear el directorio si no existe
-    $signedDir = __DIR__ . '/../document/signed';
-    if (!is_dir($signedDir)) {
-        mkdir($signedDir, 0755, true);
-    }
-    $signedDir = realpath($signedDir);
-}
-
-define('SIGNED_DIR', $signedDir);
-define('MAX_FILE_SIZE', 20 * 1024 * 1024); // 20 MB
+define('MAX_FILE_SIZE', 4 * 1024 * 1024); // 4 MB (límite Vercel Hobby)
 define('MIN_FILE_SIZE', 100);              // 100 bytes mínimo (un PDF válido no es tan chico)
+$useBlob = !empty(getenv('BLOB_READ_WRITE_TOKEN'));
+if ($useBlob) {
+    require_once __DIR__ . '/_lib/store.php';
+} else {
+    $signedDir = realpath(__DIR__ . '/../document/signed');
+    if ($signedDir === false) {
+        $signedDir = __DIR__ . '/../document/signed';
+        if (!is_dir($signedDir)) {
+            mkdir($signedDir, 0755, true);
+        }
+        $signedDir = realpath($signedDir);
+    }
+    define('SIGNED_DIR', $signedDir);
+}
 
 // Obtener parámetros
 $requestedFile = $_GET['file'] ?? '';
@@ -116,7 +119,7 @@ if ($bodySize < MIN_FILE_SIZE) {
 
 if ($bodySize > MAX_FILE_SIZE) {
     http_response_code(413);
-    echo json_encode(['error' => 'Archivo demasiado grande. Límite: 20 MB.']);
+    echo json_encode(['error' => 'Archivo demasiado grande. Límite: 4 MB.']);
     exit;
 }
 
@@ -132,12 +135,25 @@ $baseName = preg_replace('/\.pdf$/i', '', $requestedFile);
 $signedFileName = $baseName . '_' . $userId . '.pdf';
 $signedFilePath = SIGNED_DIR . '/' . $signedFileName;
 
-// Guardar el archivo
-$bytesWritten = file_put_contents($signedFilePath, $rawBody);
-if ($bytesWritten === false) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Error al guardar el archivo firmado.']);
-    exit;
+// Guardar — Vercel Blob o disco local
+if ($useBlob) {
+    $result = blobPut('signed/' . $signedFileName, $rawBody, [
+        'contentType' => 'application/pdf',
+    ]);
+    if (!$result) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Error al guardar el archivo firmado en Blob.']);
+        exit;
+    }
+    $bytesWritten = $result['size'];
+} else {
+    $signedFilePath = SIGNED_DIR . '/' . $signedFileName;
+    $bytesWritten = file_put_contents($signedFilePath, $rawBody);
+    if ($bytesWritten === false) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Error al guardar el archivo firmado.']);
+        exit;
+    }
 }
 
 // Respuesta exitosa

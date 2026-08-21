@@ -15,15 +15,20 @@
  *   - Máximo 20 MB
  */
 
-$signedDir = realpath(__DIR__ . '/../document/signed');
-if ($signedDir === false) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Directorio document/signed/ no encontrado']);
-    exit;
+$useBlob = !empty(getenv('BLOB_READ_WRITE_TOKEN'));
+if ($useBlob) {
+    require_once __DIR__ . '/_lib/store.php';
+    $signedDir = null;
+} else {
+    $signedDir = realpath(__DIR__ . '/../document/signed');
+    if ($signedDir === false) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Directorio document/signed/ no encontrado']);
+        exit;
+    }
+    define('SIGNED_DIR', $signedDir);
+    define('MAX_FILE_SIZE', 20 * 1024 * 1024);
 }
-
-define('SIGNED_DIR', $signedDir);
-define('MAX_FILE_SIZE', 20 * 1024 * 1024);
 
 // CORS
 header('Access-Control-Allow-Origin: *');
@@ -62,6 +67,19 @@ if (!preg_match('/\.pdf$/i', $requestedFile)) {
     exit;
 }
 
+// Vercel Blob: redirect 302
+if ($useBlob) {
+    $head = blobHead('signed/' . $requestedFile);
+    if ($head === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Archivo firmado no encontrado.']);
+        exit;
+    }
+    header('Location: ' . $head['url'], true, 302);
+    exit;
+}
+
+// Disco local (Docker)
 $filePath = SIGNED_DIR . '/' . $requestedFile;
 
 if (!file_exists($filePath)) {

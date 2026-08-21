@@ -71,20 +71,28 @@ if (!preg_match('/^[a-f0-9-]{36}$/i', $jobId)) {
     exit;
 }
 
-// Leer archivo
-$storageFile = STORAGE_DIR . '/' . $jobId . '.json';
-
-if (!file_exists($storageFile)) {
-    http_response_code(404);
-    echo json_encode(['error' => 'Job no encontrado']);
-    exit;
-}
-
-$content = file_get_contents($storageFile);
-if ($content === false) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Error leyendo job']);
-    exit;
+// Leer job — Vercel Blob o disco local
+if (!empty(getenv('BLOB_READ_WRITE_TOKEN'))) {
+    require_once __DIR__ . '/_lib/store.php';
+    $content = blobGet('jobs/' . $jobId . '.json');
+    if ($content === false) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Job no encontrado']);
+        exit;
+    }
+} else {
+    $storageFile = STORAGE_DIR . '/' . $jobId . '.json';
+    if (!file_exists($storageFile)) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Job no encontrado']);
+        exit;
+    }
+    $content = file_get_contents($storageFile);
+    if ($content === false) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Error leyendo job']);
+        exit;
+    }
 }
 
 $jobData = json_decode($content, true);

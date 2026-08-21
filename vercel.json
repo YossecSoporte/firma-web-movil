@@ -1,0 +1,79 @@
+{
+  "functions": {
+    "api/index.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": ["document/**"]
+    },
+    "api/generar-uri.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 30,
+      "includeFiles": ["document/**", "api/_lib/**"]
+    },
+    "api/job.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": ["api/_lib/**"]
+    },
+    "api/upload-signed.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 30,
+      "includeFiles": ["api/_lib/**"]
+    },
+    "api/download.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": ["document/**"]
+    },
+    "api/download-signed.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": ["api/_lib/**"]
+    },
+    "api/list-pdfs.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": ["document/**"]
+    },
+    "api/list-signed.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": ["api/_lib/**"]
+    },
+    "api/clear-signed.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": ["api/_lib/**"]
+    },
+    "api/token.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": ["api/_lib/**"]
+    },
+    "api/generar-job.php": {
+      "runtime": "vercel-php@0.7.3",
+      "maxDuration": 10,
+      "includeFiles": ["api/_lib/**"]
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/job/([^/]+)",
+      "destination": "/api/job.php?job=$1"
+    },
+    {
+      "source": "/api/token/([^/]+)",
+      "destination": "/api/token.php?job=$1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
+    }
+  ]
+}
