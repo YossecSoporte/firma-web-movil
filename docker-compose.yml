@@ -11,7 +11,7 @@ services:
     environment:
       - PHP_MEMORY_LIMIT=256M
       - PHP_MAX_EXECUTION_TIME=60
-      - BASE_URL_EXTERNO=http://localhost:8081
+      - BASE_URL_EXTERNO=http://192.168.15.20:8081
       - ENCRYPTION_KEY=l1L0gPaxGHkH/aei5Hs7awe8XhPrHHtzywfZYF+mTc0=
     restart: unless-stopped
     healthcheck:

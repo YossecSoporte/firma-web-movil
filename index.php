@@ -68,6 +68,8 @@
     .btn-view-signed:hover:not(:disabled) { background: #218838; }
     .btn-sign-github { background: #6f42c1; color: #fff; }
     .btn-sign-github:hover:not(:disabled) { background: #5a32a3; }
+    .btn-sign-batch { background: #fd7e14; color: #fff; }
+    .btn-sign-batch:hover:not(:disabled) { background: #e06a0d; }
     .btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
 
     /* ===== Cards (móvil) ===== */
@@ -133,9 +135,12 @@
       .card { padding: 18px; }
       .table-wrap { display: none; }
       .cards-mobile { display: flex; }
+      #specialTable { display: none; }
+      #cardsSpecial { display: flex !important; }
       h1 { font-size: 1.3rem; }
       .toolbar { flex-direction: column; align-items: stretch; }
-      .refresh-btn { width: 100%; justify-content: center; }
+      .toolbar > div { width: 100%; }
+      .toolbar > div > button { width: 100%; justify-content: center; }
     }
   </style>
 </head>
@@ -146,10 +151,16 @@
 
     <div class="toolbar">
       <span id="docCount" class="count">Cargando...</span>
-      <button id="btnRefresh" class="refresh-btn" type="button">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button id="btnBatchSign" class="refresh-btn" type="button" disabled>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          <span id="batchLabel">Firma en bloque</span>
+        </button>
+        <button id="btnRefresh" class="refresh-btn" type="button">
         <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
         <span id="refreshLabel">Actualizar</span>
-      </button>
+        </button>
+      </div>
     </div>
 
     <!-- Tabla para escritorio -->
@@ -172,6 +183,54 @@
     <!-- Cards para móvil -->
     <div id="cardsMobile" class="cards-mobile">
       <div class="empty-state">Cargando documentos...</div>
+    </div>
+
+    <!-- ===== CASOS DE PRUEBA ESPECIALES ===== -->
+    <div id="specialCases" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e9ecef;">
+      <h2 style="font-size: 1rem; color: #495057; margin-bottom: 12px; text-align: center;">Casos de prueba especiales</h2>
+      
+      <div class="table-wrap">
+        <table id="specialTable" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>Caso</th>
+              <th>Descripción</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-name">Imagen de firma fallida</td>
+              <td>URL de imagen inválida (404) en <code>vis_sig_graphic</code>. Ver cómo la app maneja el gráfico roto.</td>
+              <td><button class="btn-action btn-sign-github" data-test="bad-image">Probar imagen rota</button></td>
+            </tr>
+            <tr>
+              <td class="doc-name">Descarga PDF fallida</td>
+              <td>URL de PDF inexistente (404) en campo <code>data</code>. Ver cómo la app maneja error de descarga.</td>
+              <td><button class="btn-action btn-sign-github" data-test="bad-pdf">Probar PDF roto</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div id="cardsSpecial" class="cards-mobile" style="display: none;">
+        <div class="doc-card">
+          <div class="dc-header">
+            <div><div class="dc-name">Imagen de firma fallida</div><div class="dc-meta">URL de imagen inválida (404) en vis_sig_graphic</div></div>
+          </div>
+          <div class="dc-actions">
+            <button class="btn-action btn-sign-github" data-test="bad-image">Probar imagen rota</button>
+          </div>
+        </div>
+        <div class="doc-card">
+          <div class="dc-header">
+            <div><div class="dc-name">Descarga PDF fallida</div><div class="dc-meta">URL de PDF inexistente (404) en campo data</div></div>
+          </div>
+          <div class="dc-actions">
+            <button class="btn-action btn-sign-github" data-test="bad-pdf">Probar PDF roto</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="statusBar" class="status-bar"></div>
@@ -229,8 +288,11 @@
       const btnRefresh  = document.getElementById('btnRefresh');
       const refreshIcon = document.getElementById('refreshIcon');
       const refreshLabel = document.getElementById('refreshLabel');
+      const btnBatch    = document.getElementById('btnBatchSign');
+      let pollingTimer  = null;
 
       let signedMap = {};
+      window._pdfFiles = [];
 
       // ===== ICONOS =====
       const ICO_VIEW   = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
@@ -239,10 +301,40 @@
       const ICO_WAIT    = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>';
 
       // ===== UTILIDADES =====
-      function showStatus(msg, type) {
+       function showStatus(msg, type) {
         statusBar.textContent = msg;
         statusBar.className = 'status-bar ' + type;
         statusBar.style.display = msg ? 'block' : 'none';
+      }
+
+      function startPolling(selectedFile, timeoutSec) {
+        if (pollingTimer) clearInterval(pollingTimer);
+        showStatus('Firma en progreso... vuelve a esta pestaña al terminar.', 'info');
+        const max = (timeoutSec || 60) * 1000;
+        const start = Date.now();
+        pollingTimer = setInterval(function () {
+          fetch(LIST_SIGNED_URL + '?original=' + encodeURIComponent(selectedFile), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.success && data.files && data.files.length > 0) {
+                clearInterval(pollingTimer);
+                pollingTimer = null;
+                showStatus('PDF firmado detectado. Actualizando lista...', 'success');
+                setTimeout(function () { showStatus('', 'info'); }, 3000);
+                loadPdfList();
+              } else if (Date.now() - start > max) {
+                clearInterval(pollingTimer);
+                pollingTimer = null;
+                showStatus('Tiempo de espera agotado. Recarga manual si el PDF está firmado.', 'error');
+                setTimeout(function () { showStatus('', 'info'); }, 5000);
+              }
+            })
+            .catch(function () { /* retry */ });
+        }, 5000);
+      }
+
+      function stopPolling() {
+        if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
       }
       function formatBytes(b) {
         if (b === 0) return '0 B';
@@ -253,6 +345,8 @@
       function baseName(f) { return f.replace(/\.pdf$/i, ''); }
       function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
       function escapeAttr(s) { return String(s).replace(/"/g,'"').replace(/'/g,'&#39;').replace(/</g,'<').replace(/>/g,'>'); }
+
+      var BATCH_EXCLUDED = ['test.pdf', 'doc_pruebaFirmado.pdf', 'pdf_horizontal.pdf'];
 
       // ===== CARGA DE LISTAS =====
       async function loadSignedList() {
@@ -290,6 +384,11 @@
           }
 
           docCount.textContent = data.files.length + ' documento' + (data.files.length !== 1 ? 's' : '');
+
+          // Guardar archivos para firma en bloque
+          window._pdfFiles = data.files;
+          var pendingCount = data.files.filter(function(f) { return BATCH_EXCLUDED.indexOf(f.filename) === -1 && !signedMap.hasOwnProperty(baseName(f.filename)); }).length;
+          btnBatch.disabled = pendingCount < 2;
 
           // Render tabla (escritorio)
           tbody.innerHTML = data.files.map(function(f) {
@@ -381,6 +480,8 @@
       // ===== FIRMAR =====
       let pendingFile = null;
       let pendingFileGitHub = null;
+      let pendingBatch = false;
+      let pendingFilesList = [];
 
       function showSignModal(file) {
         pendingFile = file;
@@ -398,10 +499,21 @@
         document.getElementById('modalToken').focus();
       }
 
+      function showSignModalBatch(files) {
+        pendingBatch = true;
+        pendingFilesList = files;
+        document.getElementById('modalToken').value = '';
+        document.getElementById('modalCertType').value = 'all';
+        document.getElementById('signModal').classList.add('open');
+        document.getElementById('modalToken').focus();
+      }
+
       function hideSignModal() {
         document.getElementById('signModal').classList.remove('open');
         pendingFile = null;
         pendingFileGitHub = null;
+        pendingBatch = false;
+        pendingFilesList = [];
       }
 
       document.getElementById('modalCancel').addEventListener('click', hideSignModal);
@@ -412,7 +524,10 @@
           showStatus('Token requerido', 'error');
           return;
         }
-        if (pendingFileGitHub) {
+        if (pendingBatch) {
+          hideSignModal();
+          await doSignBatch(token, certificateType);
+        } else if (pendingFileGitHub) {
           const file = pendingFileGitHub;
           hideSignModal();
           await doSignGitHub(file, token, certificateType);
@@ -455,7 +570,7 @@
                   vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
                   vis_sig_page: 1, vis_sig_text_size: 10,
                   vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}',
-                  vis_sig_graphic: 'http://imagen-firma.com/logo.png'
+                  vis_sig_graphic: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTlcZ50Ci9uRJBet3r17ORbbDGEq-adGoaPS5Hm8L07qD_okGo9F6URTWE&s=10'
                 }
               }]
             }),
@@ -486,7 +601,7 @@
         console.log('Encrypted:', deepLink);
         console.log('Plain:', data.uri_plain);
 
-        showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + '...', 'info');
+         showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + '...', 'info');
 
         const start = Date.now();
         let fallbackTriggered = false;
@@ -509,11 +624,7 @@
 
         window.location.href = deepLink;
 
-        // Recargar al volver (la app ya subió el PDF)
-        window.addEventListener('focus', function onBack() {
-          window.removeEventListener('focus', onBack);
-          setTimeout(loadPdfList, 2000);
-        }, { once: true });
+        startPolling(selectedFile, 60);
       }
 
       // ===== FIRMAR GITHUB =====
@@ -547,7 +658,7 @@
                   vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
                   vis_sig_page: 1, vis_sig_text_size: 10,
                   vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}',
-                  vis_sig_graphic: 'http://imagen-firma.com/logo.png'
+                  vis_sig_graphic: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTlcZ50Ci9uRJBet3r17ORbbDGEq-adGoaPS5Hm8L07qD_okGo9F6URTWE&s=10'
                 }
               }]
             }),
@@ -601,11 +712,7 @@
 
         window.location.href = deepLink;
 
-        // Recargar al volver (la app ya subió el PDF)
-        window.addEventListener('focus', function onBack() {
-          window.removeEventListener('focus', onBack);
-          setTimeout(loadPdfList, 2000);
-        }, { once: true });
+        startPolling(selectedFile, 60);
       }
 
       // Wrapper para mantener compatibilidad con onclick directo
@@ -622,8 +729,280 @@
         showSignModalGitHub(selectedFile);
       }
 
+      // ===== FIRMAR EN BLOQUE =====
+      function getPendingFiles() {
+        var pending = [];
+        if (typeof window._pdfFiles !== 'undefined') {
+          window._pdfFiles.forEach(function(f) {
+            var base = baseName(f.filename);
+            if (BATCH_EXCLUDED.indexOf(f.filename) === -1 && !signedMap.hasOwnProperty(base)) {
+              pending.push(f.filename);
+            }
+          });
+        }
+        return pending;
+      }
+
+      function openAppBatch() {
+        var pending = getPendingFiles();
+        if (pending.length === 0) {
+          showStatus('No hay documentos pendientes para firma en bloque.', 'error');
+          return;
+        }
+        showSignModalBatch(pending);
+      }
+
+      async function doSignBatch(userToken, certificateType) {
+        var pending = getPendingFiles();
+        if (pending.length === 0) { showStatus('No hay documentos pendientes.', 'error'); return; }
+
+        var ICO_WAIT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>';
+        var batchLabel = document.getElementById('batchLabel');
+        var btnBatch = document.getElementById('btnBatchSign');
+        var origLabel = batchLabel.textContent;
+        btnBatch.disabled = true;
+        batchLabel.textContent = 'Preparando...';
+        btnBatch.querySelector('svg').classList.add('spin');
+        showStatus('Generando firma en bloque para ' + pending.length + ' documentos...', 'info');
+
+        var documents = pending.map(function(file) {
+          return {
+            file: file, user_id: 'USER123', doc_sha256: '',
+            settings: {
+              vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
+              vis_sig_page: 1, vis_sig_text_size: 10,
+              vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}',
+              vis_sig_graphic: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTlcZ50Ci9uRJBet3r17ORbbDGEq-adGoaPS5Hm8L07qD_okGo9F6URTWE&s=10'
+            }
+          };
+        });
+
+        var data;
+        try {
+          var resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              configuration: {
+                signature_type: 'basic',
+                signature_reason: 'Acepto el contenido del documento',
+                generate_request: 'NOMBRE EMPRESA',
+                certificate_type: certificateType
+              },
+              token: userToken,
+              documents: documents
+            }),
+            credentials: 'same-origin'
+          });
+          if (!resp.ok) {
+            var errData = await resp.json().catch(function() { return {}; });
+            throw new Error(errData.error || 'HTTP ' + resp.status);
+          }
+          data = await resp.json();
+        } catch (err) {
+          btnBatch.disabled = false;
+          batchLabel.textContent = origLabel;
+          btnBatch.querySelector('svg').classList.remove('spin');
+          showStatus('No se pudo generar la URI en bloque: ' + err.message, 'error');
+          return;
+        }
+
+        btnBatch.disabled = false;
+        batchLabel.textContent = origLabel;
+        btnBatch.querySelector('svg').classList.remove('spin');
+
+        var encryptedBlob = data.uri_encrypted || data.data;
+        var deepLink = 'firmeasy://sign?data=' + encodeURIComponent(encryptedBlob);
+
+        var deepLinkDisplay = document.getElementById('deepLinkDisplay');
+        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        deepLinkDisplay.style.display = 'block';
+
+        console.log('=== FIRMEASY DEEP LINK (BLOQUE) ===');
+        console.log('Encrypted:', deepLink);
+        console.log('Plain:', data.uri_plain);
+        console.log('Documentos:', pending.join(', '));
+
+        showStatus('Abriendo app FirmEasy para firmar ' + pending.length + ' documentos...', 'info');
+
+        var start = Date.now();
+        var fallbackTriggered = false;
+        var timer = setTimeout(function () {
+          if (fallbackTriggered) return;
+          if (Date.now() - start < VISIBILITY_GRACE_MS && document.visibilityState === 'visible') {
+            fallbackTriggered = true;
+            window.location.href = FALLBACK_URL;
+          }
+        }, FALLBACK_DELAY_MS);
+
+        function cancelFallback() {
+          if (!fallbackTriggered) { clearTimeout(timer); fallbackTriggered = true; }
+        }
+        document.addEventListener('visibilitychange', function onVis() {
+          if (document.visibilityState === 'hidden') cancelFallback();
+        }, { once: true });
+        window.addEventListener('pagehide', cancelFallback, { once: true });
+        window.addEventListener('blur', cancelFallback, { once: true });
+
+        window.location.href = deepLink;
+
+        startPolling(pending[0], 90);
+      }
+
+      // ===== CASOS ESPECIALES DE PRUEBA =====
+      async function doSignBadImage(userToken, certificateType) {
+        const btn = document.querySelector('[data-test="bad-image"]');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
+        showStatus('Generando URI con imagen de firma rota...', 'info');
+
+        let data;
+        try {
+          const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              configuration: {
+                signature_type: 'basic',
+                signature_reason: 'Acepto el contenido del documento',
+                generate_request: 'NOMBRE EMPRESA',
+                certificate_type: certificateType
+              },
+              token: userToken,
+              documents: [{
+                file: 'doc_prueba1.pdf', user_id: 'USER123', doc_sha256: '',
+                settings: {
+                  vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
+                  vis_sig_page: 1, vis_sig_text_size: 10,
+                  vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}',
+                  vis_sig_graphic: 'https://httpbin.org/status/404'  // Imagen que falla (404)
+                }
+              }]
+            }),
+            credentials: 'same-origin'
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || 'HTTP ' + resp.status);
+          }
+          data = await resp.json();
+        } catch (err) {
+          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
+          return;
+        }
+
+        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+
+        const encryptedBlob = data.uri_encrypted || data.data;
+        const deepLink = 'firmeasy://sign?data=' + encodeURIComponent(encryptedBlob);
+
+        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
+        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        deepLinkDisplay.style.display = 'block';
+
+        console.log('=== FIRMEASY DEEP LINK (IMAGEN ROTA) ===');
+        console.log('Encrypted:', deepLink);
+        console.log('Plain:', data.uri_plain);
+
+        showStatus('Abriendo app FirmEasy con imagen rota...', 'info');
+        window.location.href = deepLink;
+        startPolling('doc_prueba1.pdf', 60);
+      }
+
+      async function doSignBadPdf(userToken, certificateType) {
+        const btn = document.querySelector('[data-test="bad-pdf"]');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
+        showStatus('Generando URI con PDF inexistente...', 'info');
+
+        let data;
+        try {
+          const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              configuration: {
+                signature_type: 'basic',
+                signature_reason: 'Acepto el contenido del documento',
+                generate_request: 'NOMBRE EMPRESA',
+                certificate_type: certificateType
+              },
+              token: userToken,
+              documents: [{
+                file: 'doc_prueba1.pdf', user_id: 'USER123', doc_sha256: '',
+                data: 'https://httpbin.org/status/404',  // PDF que falla (404)
+                settings: {
+                  vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
+                  vis_sig_page: 1, vis_sig_text_size: 10,
+                  vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}',
+                  vis_sig_graphic: 'https://example.com/logo.png'
+                }
+              }]
+            }),
+            credentials: 'same-origin'
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || 'HTTP ' + resp.status);
+          }
+          data = await resp.json();
+        } catch (err) {
+          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
+          return;
+        }
+
+        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+
+        const encryptedBlob = data.uri_encrypted || data.data;
+        const deepLink = 'firmeasy://sign?data=' + encodeURIComponent(encryptedBlob);
+
+        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
+        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        deepLinkDisplay.style.display = 'block';
+
+        console.log('=== FIRMEASY DEEP LINK (PDF ROTO) ===');
+        console.log('Encrypted:', deepLink);
+        console.log('Plain:', data.uri_plain);
+
+        showStatus('Abriendo app FirmEasy con PDF roto...', 'info');
+        window.location.href = deepLink;
+        startPolling('doc_prueba1.pdf', 60);
+      }
+
       // ===== INIT =====
       btnRefresh.addEventListener('click', refreshAll);
+      btnBatch.addEventListener('click', openAppBatch);
+
+      // Listeners casos especiales
+      document.querySelectorAll('[data-test="bad-image"]').forEach(function(btn) {
+        btn.addEventListener('click', function() { showSignModalSpecial('bad-image'); });
+      });
+      document.querySelectorAll('[data-test="bad-pdf"]').forEach(function(btn) {
+        btn.addEventListener('click', function() { showSignModalSpecial('bad-pdf'); });
+      });
+
+      function showSignModalSpecial(testType) {
+        document.getElementById('modalToken').value = '';
+        document.getElementById('modalCertType').value = 'all';
+        document.getElementById('signModal').classList.add('open');
+        document.getElementById('modalToken').focus();
+
+        // Sobrescribir el handler del modal confirm para este caso especial
+        const modalConfirm = document.getElementById('modalConfirm');
+        const newConfirm = modalConfirm.cloneNode(true);
+        modalConfirm.parentNode.replaceChild(newConfirm, modalConfirm);
+        newConfirm.addEventListener('click', async function() {
+          const token = document.getElementById('modalToken').value.trim();
+          const certificateType = document.getElementById('modalCertType').value;
+          if (!token) { showStatus('Token requerido', 'error'); return; }
+          document.getElementById('signModal').classList.remove('open');
+          if (testType === 'bad-image') await doSignBadImage(token, certificateType);
+          else if (testType === 'bad-pdf') await doSignBadPdf(token, certificateType);
+        });
+      }
+
       loadPdfList();
     })();
   </script>

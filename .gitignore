@@ -1,0 +1,24 @@
+# Storage — NUNCA se guarda nada en storage/
+storage/*
+!storage/.gitkeep
+
+# PDFs firmados (subidos por la app móvil) — se borran con clear-signed
+document/signed/*
+
+# Docker / entorno local
+.env
+.env.local
+docker-compose.override.yml
+*.local
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Logs
+*.log
