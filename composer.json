@@ -1,5 +1,5 @@
 {
-  "name": "firma-web-movil",
+  "name": "yossecsoporte/firma-web-movil",
   "version": "1.0.0",
   "description": "FirmEasy Web — backend PHP para firma digital móvil",
   "require": {
