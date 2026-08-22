@@ -243,14 +243,10 @@
     <div class="footer">Requiere app FirmEasy instalada en este dispositivo.</div>
   </div>
 
-  <!-- Modal Token + Certificate Type -->
+  <!-- Modal Certificate Type -->
   <div id="signModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal">
       <h3 id="modalTitle">Configurar firma</h3>
-      <div class="form-group">
-        <label for="modalToken">Token de seguridad</label>
-        <input type="password" id="modalToken" placeholder="Ingrese su token" autocomplete="off" required>
-      </div>
       <div class="form-group">
         <label for="modalCertType">Tipo de certificado</label>
         <select id="modalCertType">
@@ -485,27 +481,21 @@
 
       function showSignModal(file) {
         pendingFile = file;
-        document.getElementById('modalToken').value = '';
         document.getElementById('modalCertType').value = 'all';
         document.getElementById('signModal').classList.add('open');
-        document.getElementById('modalToken').focus();
       }
 
       function showSignModalGitHub(file) {
         pendingFileGitHub = file;
-        document.getElementById('modalToken').value = '';
         document.getElementById('modalCertType').value = 'all';
         document.getElementById('signModal').classList.add('open');
-        document.getElementById('modalToken').focus();
       }
 
       function showSignModalBatch(files) {
         pendingBatch = true;
         pendingFilesList = files;
-        document.getElementById('modalToken').value = '';
         document.getElementById('modalCertType').value = 'all';
         document.getElementById('signModal').classList.add('open');
-        document.getElementById('modalToken').focus();
       }
 
       function hideSignModal() {
@@ -518,23 +508,18 @@
 
       document.getElementById('modalCancel').addEventListener('click', hideSignModal);
       document.getElementById('modalConfirm').addEventListener('click', async function() {
-        const token = document.getElementById('modalToken').value.trim();
         const certificateType = document.getElementById('modalCertType').value;
-        if (!token) {
-          showStatus('Token requerido', 'error');
-          return;
-        }
         if (pendingBatch) {
           hideSignModal();
-          await doSignBatch(token, certificateType);
+          await doSignBatch('', certificateType);
         } else if (pendingFileGitHub) {
           const file = pendingFileGitHub;
           hideSignModal();
-          await doSignGitHub(file, token, certificateType);
+          await doSignGitHub(file, '', certificateType);
         } else {
           const file = pendingFile;
           hideSignModal();
-          await doSign(file, token, certificateType);
+          await doSign(file, '', certificateType);
         }
       });
 
@@ -984,22 +969,18 @@
       });
 
       function showSignModalSpecial(testType) {
-        document.getElementById('modalToken').value = '';
         document.getElementById('modalCertType').value = 'all';
         document.getElementById('signModal').classList.add('open');
-        document.getElementById('modalToken').focus();
 
         // Sobrescribir el handler del modal confirm para este caso especial
         const modalConfirm = document.getElementById('modalConfirm');
         const newConfirm = modalConfirm.cloneNode(true);
         modalConfirm.parentNode.replaceChild(newConfirm, modalConfirm);
         newConfirm.addEventListener('click', async function() {
-          const token = document.getElementById('modalToken').value.trim();
           const certificateType = document.getElementById('modalCertType').value;
-          if (!token) { showStatus('Token requerido', 'error'); return; }
           document.getElementById('signModal').classList.remove('open');
-          if (testType === 'bad-image') await doSignBadImage(token, certificateType);
-          else if (testType === 'bad-pdf') await doSignBadPdf(token, certificateType);
+          if (testType === 'bad-image') await doSignBadImage('', certificateType);
+          else if (testType === 'bad-pdf') await doSignBadPdf('', certificateType);
         });
       }
 

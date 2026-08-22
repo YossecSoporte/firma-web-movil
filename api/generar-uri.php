@@ -95,13 +95,42 @@ if (!isset($data['configuration']) || !isset($data['documents']) || !is_array($d
     exit;
 }
 
-// Validar token
-if (!isset($data['token']) || empty($data['token'])) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Campo "token" requerido en el body.']);
-    exit;
+// Obtener token: usar el del body o auto-obtener de la API FirmEasy
+$userToken = $data['token'] ?? '';
+if (empty($userToken)) {
+    $userToken = fetchBatchToken();
 }
-$userToken = $data['token'];
+
+function fetchBatchToken(): string {
+    $apiKey = getenv('FIRMEASY_API_KEY');
+    if (empty($apiKey)) {
+        throw new Exception('FIRMEASY_API_KEY no configurada en entorno');
+    }
+    $ch = curl_init('https://enterprise.digital.firmeasy.legal/api/v1/auth/token');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode(['type' => 'batch']),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'X-API-KEY: ' . $apiKey,
+        ],
+        CURLOPT_TIMEOUT        => 15,
+    ]);
+    $resp = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
+
+    if ($resp === false || $code !== 200) {
+        throw new Exception("Error obteniendo token batch (HTTP $code): $err");
+    }
+    $json = json_decode($resp, true);
+    if (empty($json['token'])) {
+        throw new Exception('Respuesta sin token: ' . $resp);
+    }
+    return $json['token'];
+}
 
 // Validar certificate_type
 $certificateType = $data['configuration']['certificate_type'] ?? 'all';
