@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/index.php": {
+    "index.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
       "includeFiles": "document/**"
@@ -57,6 +57,10 @@
     }
   },
   "rewrites": [
+    {
+      "source": "/",
+      "destination": "/index.php"
+    },
     {
       "source": "/api/job/([^/]+)",
       "destination": "/api/job.php?job=$1"
