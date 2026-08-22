@@ -1,9 +1,9 @@
 {
   "functions": {
-    "index.php": {
+    "api/index.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
-      "includeFiles": "document/**"
+      "includeFiles": "{document/**,index.php}"
     },
     "api/generar-uri.php": {
       "runtime": "vercel-php@0.7.3",
@@ -59,7 +59,7 @@
   "rewrites": [
     {
       "source": "/",
-      "destination": "/index.php"
+      "destination": "/api/index.php"
     },
     {
       "source": "/api/job/([^/]+)",
