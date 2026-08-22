@@ -3,57 +3,57 @@
     "api/index.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
-      "includeFiles": ["document/**"]
+      "includeFiles": "document/**"
     },
     "api/generar-uri.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 30,
-      "includeFiles": ["document/**", "api/_lib/**"]
+      "includeFiles": "{api/_lib/**,document/**}"
     },
     "api/job.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
-      "includeFiles": ["api/_lib/**"]
+      "includeFiles": "api/_lib/**"
     },
     "api/upload-signed.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 30,
-      "includeFiles": ["api/_lib/**"]
+      "includeFiles": "api/_lib/**"
     },
     "api/download.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
-      "includeFiles": ["document/**"]
+      "includeFiles": "document/**"
     },
     "api/download-signed.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
-      "includeFiles": ["api/_lib/**"]
+      "includeFiles": "api/_lib/**"
     },
     "api/list-pdfs.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
-      "includeFiles": ["document/**"]
+      "includeFiles": "document/**"
     },
     "api/list-signed.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
-      "includeFiles": ["api/_lib/**"]
+      "includeFiles": "api/_lib/**"
     },
     "api/clear-signed.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
-      "includeFiles": ["api/_lib/**"]
+      "includeFiles": "api/_lib/**"
     },
     "api/token.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
-      "includeFiles": ["api/_lib/**"]
+      "includeFiles": "api/_lib/**"
     },
     "api/generar-job.php": {
       "runtime": "vercel-php@0.7.3",
       "maxDuration": 10,
-      "includeFiles": ["api/_lib/**"]
+      "includeFiles": "api/_lib/**"
     }
   },
   "rewrites": [
