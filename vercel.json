@@ -1,10 +1,5 @@
 {
   "functions": {
-    "api/index.php": {
-      "runtime": "vercel-php@0.7.4",
-      "maxDuration": 10,
-      "includeFiles": "index.php"
-    },
     "api/generar-uri.php": {
       "runtime": "vercel-php@0.7.4",
       "maxDuration": 30,
@@ -50,10 +45,6 @@
     }
   },
   "rewrites": [
-    {
-      "source": "/",
-      "destination": "/api/index.php"
-    },
     {
       "source": "/api/job/([^/]+)",
       "destination": "/api/job.php?job=$1"
