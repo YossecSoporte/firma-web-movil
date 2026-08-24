@@ -65,7 +65,7 @@ function _blobStoreId(): string {
 }
 
 function _blobStoreUrl(): string {
-    return 'https://' . _blobStoreId() . '.public.blob.vercel-storage.com';
+    return 'https://' . _blobStoreId() . '.private.blob.vercel-storage.com';
 }
 
 // ── GET (leer) ─────────────────────────────────────────────
