@@ -265,7 +265,13 @@ $jobData = [
 $jobJson = json_encode($jobData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 if (!empty(getenv('BLOB_READ_WRITE_TOKEN') ?: getenv('VERCEL_OIDC_TOKEN'))) {
     require_once __DIR__ . '/_lib/store.php';
-    $saved = blobPut('jobs/' . $job . '.json', $jobJson, ['contentType' => 'application/json']);
+    try {
+        $saved = blobPut('jobs/' . $job . '.json', $jobJson, ['contentType' => 'application/json']);
+    } catch (Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Blob exception: ' . $e->getMessage()]);
+        exit;
+    }
 } else {
     $storageFile = STORAGE_DIR . '/' . $job . '.json';
     $saved = file_put_contents($storageFile, $jobJson) !== false;
