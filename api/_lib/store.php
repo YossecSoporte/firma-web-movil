@@ -60,6 +60,7 @@ function _blobAuthHeaders(): array {
     return [
         'Authorization: Bearer ' . _blobBearer(),
         'x-vercel-blob-store-id: ' . $storeId,
+        'x-api-version: 12',
     ];
 }
 
@@ -114,7 +115,7 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
     $addSuffix = !empty($opts['addRandomSuffix']) ? '1' : '0';
     $contentType = $opts['contentType'] ?? 'application/octet-stream';
 
-    $url = _blobApiUrl('?pathname=' . $path);
+    $url = _blobApiUrl('?pathname=' . rawurlencode($path));
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_CUSTOMREQUEST  => 'PUT',
