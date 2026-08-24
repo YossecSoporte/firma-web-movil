@@ -121,7 +121,8 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
         CURLOPT_POSTFIELDS     => $data,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER     => array_merge(_blobAuthHeaders(), [
-            'Content-Type: ' . $contentType,
+            'x-vercel-blob-access: private',
+            'x-content-type: ' . $contentType,
             'Content-Length: ' . strlen($data),
             'x-add-random-suffix: ' . $addSuffix,
         ]),
