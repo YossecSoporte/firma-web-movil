@@ -5,6 +5,10 @@
       "maxDuration": 30,
       "includeFiles": "document/**"
     },
+    "api/debug-env.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
     "api/job.php": {
       "runtime": "vercel-php@0.7.4",
       "maxDuration": 10
