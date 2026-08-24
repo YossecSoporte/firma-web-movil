@@ -136,7 +136,7 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
             'pathname' => $path,
         ];
     }
-    return false;
+    throw new Exception("Blob PUT fallo (HTTP $code) a $url: " . substr((string)$resp, 0, 300));
 }
 
 // ── LIST ───────────────────────────────────────────────────
