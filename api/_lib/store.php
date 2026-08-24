@@ -114,7 +114,7 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
     $addSuffix = !empty($opts['addRandomSuffix']) ? '1' : '0';
     $contentType = $opts['contentType'] ?? 'application/octet-stream';
 
-    $url = _blobApiUrl('?pathname=' . rawurlencode($path));
+    $url = _blobApiUrl('?pathname=' . $path);
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_CUSTOMREQUEST  => 'PUT',
