@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Configuración
 define('MAX_FILE_SIZE', 4 * 1024 * 1024); // 4 MB (límite Vercel Hobby)
 define('MIN_FILE_SIZE', 100);              // 100 bytes mínimo (un PDF válido no es tan chico)
-$useBlob = !empty(getenv('BLOB_READ_WRITE_TOKEN'));
+$useBlob = !empty(getenv('BLOB_READ_WRITE_TOKEN') ?: getenv('VERCEL_OIDC_TOKEN'));
 if ($useBlob) {
     require_once __DIR__ . '/_lib/store.php';
 } else {

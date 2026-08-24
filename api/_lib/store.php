@@ -14,21 +14,58 @@
  */
 
 // ── Token y base URL ───────────────────────────────────────
-function _blobToken(): string {
-    $token = getenv('BLOB_READ_WRITE_TOKEN');
-    if (empty($token)) {
-        throw new Exception('BLOB_READ_WRITE_TOKEN no configurado');
-    }
-    return $token;
+// Autenticación (en orden de prioridad):
+//   1. env BLOB_READ_WRITE_TOKEN (token estático)
+//   2. env VERCEL_OIDC_TOKEN + env BLOB_STORE_ID (conexión OIDC del store)
+//   3. constante BLOB_TOKEN_FALLBACK (hardcodeada, último recurso)
+
+function _blobRwToken(): string {
+    $t = getenv('BLOB_READ_WRITE_TOKEN');
+    return !empty($t) ? $t : (defined('BLOB_TOKEN_FALLBACK') ? BLOB_TOKEN_FALLBACK : '');
 }
 
-// Extraer storeId del token: vercel_blob_{storeId}_{secret}
-function _blobStoreUrl(): string {
-    $token = _blobToken();
-    if (preg_match('/^vercel_blob_([a-z0-9]+)_/', $token, $m)) {
-        return 'https://' . $m[1] . '.public.blob.vercel-storage.com';
+function _blobOidcToken(): string {
+    $t = getenv('VERCEL_OIDC_TOKEN');
+    return $t ?: '';
+}
+
+function _blobEnvStoreId(): string {
+    $id = getenv('BLOB_STORE_ID');
+    if (!empty($id)) {
+        return preg_replace('/^store_/', '', trim($id));
     }
-    throw new Exception('Formato de BLOB_READ_WRITE_TOKEN inválido');
+    return '';
+}
+
+function _blobAuthHeaders(): array {
+    $rw = _blobRwToken();
+    if ($rw !== '') {
+        return ['Authorization: Bearer ' . $rw];
+    }
+    $oidc = _blobOidcToken();
+    $storeId = _blobEnvStoreId();
+    if ($oidc !== '' && $storeId !== '') {
+        return [
+            'Authorization: Bearer ' . $oidc,
+            'x-vercel-blob-store-id: ' . $storeId,
+        ];
+    }
+    throw new Exception('Sin credenciales de Vercel Blob (ni token ni OIDC)');
+}
+
+function _blobStoreId(): string {
+    // Del env BLOB_STORE_ID o del token RW: vercel_blob_{storeId}_{secret}
+    $envId = _blobEnvStoreId();
+    if ($envId !== '') return $envId;
+    $rw = _blobRwToken();
+    if ($rw !== '' && preg_match('/^vercel_blob_([a-z0-9]+)_/', $rw, $m)) {
+        return $m[1];
+    }
+    throw new Exception('No se pudo determinar el store id');
+}
+
+function _blobStoreUrl(): string {
+    return 'https://' . _blobStoreId() . '.public.blob.vercel-storage.com';
 }
 
 // ── GET (leer) ─────────────────────────────────────────────
@@ -37,7 +74,7 @@ function blobGet(string $path): string|false {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER    => ['Authorization: Bearer ' . _blobToken()],
+        CURLOPT_HTTPHEADER    => _blobAuthHeaders(),
         CURLOPT_TIMEOUT       => 30,
         CURLOPT_FOLLOWLOCATION => false,
     ]);
@@ -55,7 +92,7 @@ function blobHead(string $path): ?array {
     curl_setopt_array($ch, [
         CURLOPT_NOBODY        => true,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER    => ['Authorization: Bearer ' . _blobToken()],
+        CURLOPT_HTTPHEADER    => _blobAuthHeaders(),
         CURLOPT_TIMEOUT       => 15,
     ]);
     curl_exec($ch);
@@ -80,12 +117,11 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
         CURLOPT_CUSTOMREQUEST => 'PUT',
         CURLOPT_POSTFIELDS    => $data,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER    => [
-            'Authorization: Bearer ' . _blobToken(),
+        CURLOPT_HTTPHEADER    => array_merge(_blobAuthHeaders(), [
             'Content-Type: ' . $contentType,
             'Content-Length: ' . strlen($data),
             'x-add-random-suffix: ' . $addSuffix,
-        ],
+        ]),
         CURLOPT_TIMEOUT       => 30,
     ]);
     $resp = curl_exec($ch);
@@ -109,7 +145,7 @@ function blobList(string $prefix = ''): array {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER    => ['Authorization: Bearer ' . _blobToken()],
+        CURLOPT_HTTPHEADER    => _blobAuthHeaders(),
         CURLOPT_TIMEOUT       => 30,
     ]);
     $resp = curl_exec($ch);
@@ -135,7 +171,7 @@ function blobList(string $prefix = ''): array {
 function blobDeleteUrls(array $urls): int {
     if (empty($urls)) return 0;
 
-    $token = _blobToken();
+    $headers = _blobAuthHeaders();
     $deleted = 0;
 
     foreach ($urls as $url) {
@@ -143,10 +179,7 @@ function blobDeleteUrls(array $urls): int {
         curl_setopt_array($ch, [
             CURLOPT_CUSTOMREQUEST => 'DELETE',
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER    => [
-                'Authorization: Bearer ' . $token,
-            ],
-            CURLOPT_TIMEOUT       => 15,
+            CURLOPT_HTTPHEADER    => $headers,
         ]);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);

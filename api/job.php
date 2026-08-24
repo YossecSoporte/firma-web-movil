@@ -72,7 +72,7 @@ if (!preg_match('/^[a-f0-9-]{36}$/i', $jobId)) {
 }
 
 // Leer job — Vercel Blob o disco local
-if (!empty(getenv('BLOB_READ_WRITE_TOKEN'))) {
+if (!empty(getenv('BLOB_READ_WRITE_TOKEN') ?: getenv('VERCEL_OIDC_TOKEN'))) {
     require_once __DIR__ . '/_lib/store.php';
     $content = blobGet('jobs/' . $jobId . '.json');
     if ($content === false) {

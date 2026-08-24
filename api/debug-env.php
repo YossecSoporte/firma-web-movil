@@ -1,11 +1,12 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-$token = getenv('BLOB_READ_WRITE_TOKEN');
+$rw = getenv('BLOB_READ_WRITE_TOKEN');
+$oidc = getenv('VERCEL_OIDC_TOKEN');
+$storeId = getenv('BLOB_STORE_ID');
 echo json_encode([
-    'blob_token_set' => !empty($token),
-    'blob_token_prefix' => $token ? substr($token, 0, 20) . '...' : null,
+    'rw_token_set' => !empty($rw),
+    'oidc_token_set' => !empty($oidc),
+    'oidc_prefix' => $oidc ? substr($oidc, 0, 30) . '...' : null,
+    'store_id' => $storeId ?: null,
     'vercel_env' => getenv('VERCEL_ENV') ?: null,
-    'all_blob_vars' => array_keys(array_filter(getenv(), function ($v, $k) {
-        return stripos($k, 'BLOB') !== false;
-    }, ARRAY_FILTER_USE_BOTH))
 ], JSON_PRETTY_PRINT);

@@ -20,7 +20,7 @@
  * }
  */
 
-$useBlob = !empty(getenv('BLOB_READ_WRITE_TOKEN'));
+$useBlob = !empty(getenv('BLOB_READ_WRITE_TOKEN') ?: getenv('VERCEL_OIDC_TOKEN'));
 if ($useBlob) {
     require_once __DIR__ . '/_lib/store.php';
     $signedDir = null;
