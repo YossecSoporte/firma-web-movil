@@ -1,9 +1,52 @@
 {
   "functions": {
-    "api/*.php": {
+    "api/index.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10,
+      "includeFiles": "index.php"
+    },
+    "api/generar-uri.php": {
       "runtime": "vercel-php@0.7.4",
       "maxDuration": 30,
-      "includeFiles": "{document/**,index.php,app-no-instalada.php}"
+      "includeFiles": "document/**"
+    },
+    "api/job.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/upload-signed.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 30
+    },
+    "api/download.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10,
+      "includeFiles": "document/**"
+    },
+    "api/download-signed.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/list-pdfs.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10,
+      "includeFiles": "document/**"
+    },
+    "api/list-signed.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/clear-signed.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/token.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/generar-job.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
     }
   },
   "rewrites": [
