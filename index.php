@@ -186,7 +186,7 @@
     </div>
 
     <!-- ===== CASOS DE PRUEBA ESPECIALES ===== -->
-    <div id="specialCases" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e9ecef;">
+    <div id="specialCases" style="display: none;">
       <h2 style="font-size: 1rem; color: #495057; margin-bottom: 12px; text-align: center;">Casos de prueba especiales</h2>
       
       <div class="table-wrap">
@@ -238,6 +238,10 @@
     <div id="deepLinkDisplay" class="deep-link-display">
       <strong>URI generada:</strong>
       <div id="deepLinkUri" style="margin-top: 4px;"></div>
+      <div style="margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 8px;">
+        <strong>JSON del job:</strong>
+        <pre id="deepLinkJson" style="margin: 4px 0 0; white-space: pre-wrap; font-size: .7rem; color: #334155;"></pre>
+      </div>
     </div>
 
     <div class="footer">Requiere app FirmEasy instalada en este dispositivo.</div>
@@ -379,15 +383,16 @@
             return;
           }
 
-          docCount.textContent = data.files.length + ' documento' + (data.files.length !== 1 ? 's' : '');
+          var visibleFiles = data.files.filter(function(f) { return BATCH_EXCLUDED.indexOf(f.filename) === -1; });
+          docCount.textContent = visibleFiles.length + ' documento' + (visibleFiles.length !== 1 ? 's' : '');
 
           // Guardar archivos para firma en bloque
-          window._pdfFiles = data.files;
-          var pendingCount = data.files.filter(function(f) { return BATCH_EXCLUDED.indexOf(f.filename) === -1 && !signedMap.hasOwnProperty(baseName(f.filename)); }).length;
+          window._pdfFiles = visibleFiles;
+          var pendingCount = visibleFiles.filter(function(f) { return !signedMap.hasOwnProperty(baseName(f.filename)); }).length;
           btnBatch.disabled = pendingCount < 2;
 
           // Render tabla (escritorio)
-          tbody.innerHTML = data.files.map(function(f) {
+          tbody.innerHTML = visibleFiles.map(function(f) {
             const base = baseName(f.filename);
             const isSigned = signedMap.hasOwnProperty(base);
             const si = signedMap[base];
@@ -400,7 +405,6 @@
               + '<td><div class="actions">'
               +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
               +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
-              +   '<button class="btn-action btn-sign-github" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar (GitHub)</button>'
               +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver firmado</button>')
@@ -408,7 +412,7 @@
           }).join('');
 
           // Render cards (móvil)
-          cardsMobile.innerHTML = data.files.map(function(f) {
+          cardsMobile.innerHTML = visibleFiles.map(function(f) {
             const base = baseName(f.filename);
             const isSigned = signedMap.hasOwnProperty(base);
             const si = signedMap[base];
@@ -422,7 +426,6 @@
               + '<div class="dc-actions">'
               +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
               +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
-              +   '<button class="btn-action btn-sign-github" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar (GitHub)</button>'
               +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver PDF firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver PDF firmado</button>')
@@ -432,11 +435,6 @@
           // Listeners Firmar (ambas vistas)
           document.querySelectorAll('.btn-sign').forEach(function(btn) {
             btn.addEventListener('click', function() { openApp(btn); });
-          });
-
-          // Listeners Firmar GitHub (ambas vistas)
-          document.querySelectorAll('.btn-sign-github').forEach(function(btn) {
-            btn.addEventListener('click', function() { openAppGitHub(btn); });
           });
 
         } catch (err) {
@@ -580,6 +578,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK ===');
@@ -668,6 +667,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (GITHUB) ===');
@@ -801,6 +801,7 @@
 
         var deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (BLOQUE) ===');
@@ -884,6 +885,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (IMAGEN ROTA) ===');
@@ -945,6 +947,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (PDF ROTO) ===');
