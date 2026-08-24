@@ -70,7 +70,7 @@ function _blobStoreUrl(): string {
 
 // ── GET (leer) ─────────────────────────────────────────────
 function blobGet(string $path): string|false {
-    $url = _blobStoreUrl() . '/' . rawurlencode($path);
+    $url = _blobStoreUrl() . '/' . implode('/', array_map('rawurlencode', explode('/', $path)));
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -87,7 +87,7 @@ function blobGet(string $path): string|false {
 
 // Obtener metadata (size, url) sin descargar el body completo
 function blobHead(string $path): ?array {
-    $url = _blobStoreUrl() . '/' . rawurlencode($path);
+    $url = _blobStoreUrl() . '/' . implode('/', array_map('rawurlencode', explode('/', $path)));
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_NOBODY        => true,
@@ -108,7 +108,7 @@ function blobHead(string $path): ?array {
 
 // ── PUT (escribir) ─────────────────────────────────────────
 function blobPut(string $path, string $data, array $opts = []): array|false {
-    $url = _blobStoreUrl() . '/' . rawurlencode($path);
+    $url = _blobStoreUrl() . '/' . implode('/', array_map('rawurlencode', explode('/', $path)));
     $addSuffix = ($opts['addRandomSuffix'] ?? false) ? '1' : '0';
     $contentType = $opts['contentType'] ?? 'application/octet-stream';
 
