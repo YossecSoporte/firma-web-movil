@@ -133,7 +133,6 @@ if (substr($rawBody, 0, 5) !== '%PDF-') {
 // Construir nombre del archivo firmado: {nombre_base}_{user_id}.pdf
 $baseName = preg_replace('/\.pdf$/i', '', $requestedFile);
 $signedFileName = $baseName . '_' . $userId . '.pdf';
-$signedFilePath = SIGNED_DIR . '/' . $signedFileName;
 
 // Guardar — Vercel Blob o disco local
 if ($useBlob) {
