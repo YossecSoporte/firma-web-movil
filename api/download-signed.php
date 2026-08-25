@@ -67,15 +67,19 @@ if (!preg_match('/\.pdf$/i', $requestedFile)) {
     exit;
 }
 
-// Vercel Blob: redirect 302
+// Vercel Blob: servir contenido vía función (store privado no permite URL directa)
 if ($useBlob) {
-    $head = blobHead('signed/' . $requestedFile);
-    if ($head === null) {
+    $content = blobGet('signed/' . $requestedFile);
+    if ($content === false) {
         http_response_code(404);
         echo json_encode(['error' => 'Archivo firmado no encontrado.']);
         exit;
     }
-    header('Location: ' . $head['url'], true, 302);
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . $requestedFile . '"');
+    header('Content-Length: ' . strlen($content));
+    header('Cache-Control: private, max-age=0');
+    echo $content;
     exit;
 }
 
