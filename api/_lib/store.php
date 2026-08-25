@@ -51,8 +51,8 @@ function _blobBearer(): string {
 }
 
 // Control-plane API (escritura, listado, borrado)
-function _blobApiUrl(string $query = ''): string {
-    return 'https://vercel.com/api/blob/' . $query;
+function _blobApiUrl(string $path = ''): string {
+    return 'https://vercel.com/api/blob' . $path;
 }
 
 function _blobAuthHeaders(): array {
@@ -115,7 +115,7 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
     $addSuffix = !empty($opts['addRandomSuffix']) ? '1' : '0';
     $contentType = $opts['contentType'] ?? 'application/octet-stream';
 
-    $url = _blobApiUrl('?pathname=' . rawurlencode($path));
+    $url = _blobApiUrl('/?pathname=' . rawurlencode($path));
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_CUSTOMREQUEST  => 'PUT',
@@ -147,7 +147,7 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
 
 // ── LIST ───────────────────────────────────────────────────
 function blobList(string $prefix = ''): array {
-    $url = _blobApiUrl('?prefix=' . rawurlencode($prefix) . '&limit=1000');
+    $url = _blobApiUrl('/?prefix=' . rawurlencode($prefix) . '&limit=1000');
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
