@@ -66,8 +66,6 @@
     .btn-sign:hover:not(:disabled) { background: #0052a3; }
     .btn-view-signed { background: #28a745; color: #fff; }
     .btn-view-signed:hover:not(:disabled) { background: #218838; }
-    .btn-sign-github { background: #6f42c1; color: #fff; }
-    .btn-sign-github:hover:not(:disabled) { background: #5a32a3; }
     .btn-sign-batch { background: #fd7e14; color: #fff; }
     .btn-sign-batch:hover:not(:disabled) { background: #e06a0d; }
     .btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
@@ -185,59 +183,15 @@
       <div class="empty-state">Cargando documentos...</div>
     </div>
 
-    <!-- ===== CASOS DE PRUEBA ESPECIALES ===== -->
-    <div id="specialCases" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e9ecef;">
-      <h2 style="font-size: 1rem; color: #495057; margin-bottom: 12px; text-align: center;">Casos de prueba especiales</h2>
-      
-      <div class="table-wrap">
-        <table id="specialTable" style="width: 100%;">
-          <thead>
-            <tr>
-              <th>Caso</th>
-              <th>Descripción</th>
-              <th>Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="doc-name">Imagen de firma fallida</td>
-              <td>URL de imagen inválida (404) en <code>vis_sig_graphic</code>. Ver cómo la app maneja el gráfico roto.</td>
-              <td><button class="btn-action btn-sign-github" data-test="bad-image">Probar imagen rota</button></td>
-            </tr>
-            <tr>
-              <td class="doc-name">Descarga PDF fallida</td>
-              <td>URL de PDF inexistente (404) en campo <code>data</code>. Ver cómo la app maneja error de descarga.</td>
-              <td><button class="btn-action btn-sign-github" data-test="bad-pdf">Probar PDF roto</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      
-      <div id="cardsSpecial" class="cards-mobile" style="display: none;">
-        <div class="doc-card">
-          <div class="dc-header">
-            <div><div class="dc-name">Imagen de firma fallida</div><div class="dc-meta">URL de imagen inválida (404) en vis_sig_graphic</div></div>
-          </div>
-          <div class="dc-actions">
-            <button class="btn-action btn-sign-github" data-test="bad-image">Probar imagen rota</button>
-          </div>
-        </div>
-        <div class="doc-card">
-          <div class="dc-header">
-            <div><div class="dc-name">Descarga PDF fallida</div><div class="dc-meta">URL de PDF inexistente (404) en campo data</div></div>
-          </div>
-          <div class="dc-actions">
-            <button class="btn-action btn-sign-github" data-test="bad-pdf">Probar PDF roto</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div id="statusBar" class="status-bar"></div>
 
     <div id="deepLinkDisplay" class="deep-link-display">
       <strong>URI generada:</strong>
       <div id="deepLinkUri" style="margin-top: 4px;"></div>
+      <div style="margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 8px;">
+        <strong>JSON del job:</strong>
+        <pre id="deepLinkJson" style="margin: 4px 0 0; white-space: pre-wrap; font-size: .7rem; color: #334155;"></pre>
+      </div>
     </div>
 
     <div class="footer">Requiere app FirmEasy instalada en este dispositivo.</div>
@@ -379,15 +333,16 @@
             return;
           }
 
-          docCount.textContent = data.files.length + ' documento' + (data.files.length !== 1 ? 's' : '');
+          var visibleFiles = data.files.filter(function(f) { return BATCH_EXCLUDED.indexOf(f.filename) === -1; });
+          docCount.textContent = visibleFiles.length + ' documento' + (visibleFiles.length !== 1 ? 's' : '');
 
           // Guardar archivos para firma en bloque
-          window._pdfFiles = data.files;
-          var pendingCount = data.files.filter(function(f) { return BATCH_EXCLUDED.indexOf(f.filename) === -1 && !signedMap.hasOwnProperty(baseName(f.filename)); }).length;
+          window._pdfFiles = visibleFiles;
+          var pendingCount = visibleFiles.filter(function(f) { return !signedMap.hasOwnProperty(baseName(f.filename)); }).length;
           btnBatch.disabled = pendingCount < 2;
 
           // Render tabla (escritorio)
-          tbody.innerHTML = data.files.map(function(f) {
+          tbody.innerHTML = visibleFiles.map(function(f) {
             const base = baseName(f.filename);
             const isSigned = signedMap.hasOwnProperty(base);
             const si = signedMap[base];
@@ -400,7 +355,6 @@
               + '<td><div class="actions">'
               +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
               +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
-              +   '<button class="btn-action btn-sign-github" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar (GitHub)</button>'
               +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver firmado</button>')
@@ -408,7 +362,7 @@
           }).join('');
 
           // Render cards (móvil)
-          cardsMobile.innerHTML = data.files.map(function(f) {
+          cardsMobile.innerHTML = visibleFiles.map(function(f) {
             const base = baseName(f.filename);
             const isSigned = signedMap.hasOwnProperty(base);
             const si = signedMap[base];
@@ -422,7 +376,6 @@
               + '<div class="dc-actions">'
               +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
               +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
-              +   '<button class="btn-action btn-sign-github" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar (GitHub)</button>'
               +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver PDF firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver PDF firmado</button>')
@@ -432,11 +385,6 @@
           // Listeners Firmar (ambas vistas)
           document.querySelectorAll('.btn-sign').forEach(function(btn) {
             btn.addEventListener('click', function() { openApp(btn); });
-          });
-
-          // Listeners Firmar GitHub (ambas vistas)
-          document.querySelectorAll('.btn-sign-github').forEach(function(btn) {
-            btn.addEventListener('click', function() { openAppGitHub(btn); });
           });
 
         } catch (err) {
@@ -475,18 +423,11 @@
 
       // ===== FIRMAR =====
       let pendingFile = null;
-      let pendingFileGitHub = null;
       let pendingBatch = false;
       let pendingFilesList = [];
 
       function showSignModal(file) {
         pendingFile = file;
-        document.getElementById('modalCertType').value = 'all';
-        document.getElementById('signModal').classList.add('open');
-      }
-
-      function showSignModalGitHub(file) {
-        pendingFileGitHub = file;
         document.getElementById('modalCertType').value = 'all';
         document.getElementById('signModal').classList.add('open');
       }
@@ -501,7 +442,6 @@
       function hideSignModal() {
         document.getElementById('signModal').classList.remove('open');
         pendingFile = null;
-        pendingFileGitHub = null;
         pendingBatch = false;
         pendingFilesList = [];
       }
@@ -512,10 +452,6 @@
         if (pendingBatch) {
           hideSignModal();
           await doSignBatch('', certificateType);
-        } else if (pendingFileGitHub) {
-          const file = pendingFileGitHub;
-          hideSignModal();
-          await doSignGitHub(file, '', certificateType);
         } else {
           const file = pendingFile;
           hideSignModal();
@@ -580,6 +516,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK ===');
@@ -612,106 +549,11 @@
         startPolling(selectedFile, 60);
       }
 
-      // ===== FIRMAR GITHUB =====
-      async function doSignGitHub(selectedFile, userToken, certificateType) {
-        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
-
-        const GITHUB_DATA_URL = 'https://raw.githubusercontent.com/YossecSoporte/DOC-PDF/main/doc_prueba1.pdf';
-
-        const btn = document.querySelector('.btn-sign-github[data-file="' + escapeAttr(selectedFile) + '"]');
-        const originalHtml = btn ? btn.innerHTML : '';
-        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
-        showStatus('Obteniendo URI de firma (GitHub) para ' + selectedFile + '...', 'info');
-
-        let data;
-        try {
-          const resp = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              configuration: {
-                signature_type: 'basic',
-                signature_reason: 'Acepto el contenido del documento',
-                generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType
-              },
-              token: userToken,
-              documents: [{
-                file: selectedFile, user_id: 'USER123', doc_sha256: '',
-                data: GITHUB_DATA_URL,
-                settings: {
-                  vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
-                  vis_sig_page: 1, vis_sig_text_size: 10,
-                  vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}',
-                  vis_sig_graphic: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTlcZ50Ci9uRJBet3r17ORbbDGEq-adGoaPS5Hm8L07qD_okGo9F6URTWE&s=10'
-                }
-              }]
-            }),
-            credentials: 'same-origin'
-          });
-          if (!resp.ok) {
-            const errData = await resp.json().catch(() => ({}));
-            throw new Error(errData.error || 'HTTP ' + resp.status);
-          }
-          data = await resp.json();
-        } catch (err) {
-          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
-          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
-          return;
-        }
-
-        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
-
-        // Usar URI encriptada para el deep link: firmeasy://sign?data=BLOB
-        const encryptedBlob = data.uri_encrypted || data.data;
-        const deepLink = 'firmeasy://sign?data=' + encodeURIComponent(encryptedBlob);
-
-        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
-        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        deepLinkDisplay.style.display = 'block';
-
-        console.log('=== FIRMEASY DEEP LINK (GITHUB) ===');
-        console.log('Encrypted:', deepLink);
-        console.log('Plain:', data.uri_plain);
-
-        showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + ' (GitHub)...', 'info');
-
-        const start = Date.now();
-        let fallbackTriggered = false;
-        const timer = setTimeout(function () {
-          if (fallbackTriggered) return;
-          if (Date.now() - start < VISIBILITY_GRACE_MS && document.visibilityState === 'visible') {
-            fallbackTriggered = true;
-            window.location.href = FALLBACK_URL;
-          }
-        }, FALLBACK_DELAY_MS);
-
-        function cancelFallback() {
-          if (!fallbackTriggered) { clearTimeout(timer); fallbackTriggered = true; }
-        }
-        document.addEventListener('visibilitychange', function onVis() {
-          if (document.visibilityState === 'hidden') cancelFallback();
-        }, { once: true });
-        window.addEventListener('pagehide', cancelFallback, { once: true });
-        window.addEventListener('blur', cancelFallback, { once: true });
-
-        window.location.href = deepLink;
-
-        startPolling(selectedFile, 60);
-      }
-
       // Wrapper para mantener compatibilidad con onclick directo
       async function openApp(btn) {
         const selectedFile = btn.getAttribute('data-file');
         if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
         showSignModal(selectedFile);
-      }
-
-      // Wrapper para Firmar con URL de GitHub
-      async function openAppGitHub(btn) {
-        const selectedFile = btn.getAttribute('data-file');
-        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
-        showSignModalGitHub(selectedFile);
       }
 
       // ===== FIRMAR EN BLOQUE =====
@@ -801,6 +643,7 @@
 
         var deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (BLOQUE) ===');
@@ -884,6 +727,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (IMAGEN ROTA) ===');
@@ -945,6 +789,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (PDF ROTO) ===');
