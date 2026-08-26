@@ -148,9 +148,9 @@ foreach ($documents as $idx => $doc) {
     $hasDataUrl = isset($doc['data']) && !empty($doc['data']);
 
     if ($hasDataUrl) {
-        $required = ['user_id', 'settings'];
+        $required = ['user_id'];
     } else {
-        $required = ['file', 'user_id', 'settings'];
+        $required = ['file', 'user_id'];
     }
 
     foreach ($required as $field) {
@@ -238,13 +238,17 @@ foreach ($documents as $idx => $doc) {
     }
     $toUrl = $BASE_URL_EXTERNO . '/api/upload-signed.php?file=' . rawurlencode($fileName) . '&user_id=' . rawurlencode($userId);
 
-    $processedDocs[] = [
+    $processed = [
         'from' => $fromUrl,
         'to' => $toUrl,
         'name_pdf' => $fileName,
-        'doc_sha256' => $docSha256,
-        'settings' => $doc['settings']
+        'doc_sha256' => $docSha256
     ];
+    // settings es opcional: solo se incluye si el cliente lo envía
+    if (isset($doc['settings']) && is_array($doc['settings'])) {
+        $processed['settings'] = $doc['settings'];
+    }
+    $processedDocs[] = $processed;
 }
 
 // Generar job, exp

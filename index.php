@@ -68,6 +68,8 @@
     .btn-view-signed:hover:not(:disabled) { background: #218838; }
     .btn-sign-github { background: #6f42c1; color: #fff; }
     .btn-sign-github:hover:not(:disabled) { background: #5a32a3; }
+    .btn-sign-nosettings { background: #e83e8c; color: #fff; }
+    .btn-sign-nosettings:hover:not(:disabled) { background: #d02f77; }
     .btn-sign-batch { background: #fd7e14; color: #fff; }
     .btn-sign-batch:hover:not(:disabled) { background: #e06a0d; }
     .btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
@@ -405,6 +407,9 @@
               + '<td><div class="actions">'
               +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
               +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
+              +   (f.filename === 'doc_prueba3.pdf'
+                    ? '<button class="btn-action btn-sign-nosettings" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar sin settings</button>'
+                    : '')
               +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver firmado</button>')
@@ -426,6 +431,9 @@
               + '<div class="dc-actions">'
               +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
               +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
+              +   (f.filename === 'doc_prueba3.pdf'
+                    ? '<button class="btn-action btn-sign-nosettings" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar sin settings</button>'
+                    : '')
               +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver PDF firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver PDF firmado</button>')
@@ -435,6 +443,11 @@
           // Listeners Firmar (ambas vistas)
           document.querySelectorAll('.btn-sign').forEach(function(btn) {
             btn.addEventListener('click', function() { openApp(btn); });
+          });
+
+          // Listeners Firmar sin settings (doc_prueba3.pdf)
+          document.querySelectorAll('.btn-sign-nosettings').forEach(function(btn) {
+            btn.addEventListener('click', function() { showSignModalSinSettings(btn.getAttribute('data-file')); });
           });
 
         } catch (err) {
@@ -474,6 +487,7 @@
       // ===== FIRMAR =====
       let pendingFile = null;
       let pendingFileGitHub = null;
+      let pendingFileSinSettings = null;
       let pendingBatch = false;
       let pendingFilesList = [];
 
@@ -489,6 +503,12 @@
         document.getElementById('signModal').classList.add('open');
       }
 
+      function showSignModalSinSettings(file) {
+        pendingFileSinSettings = file;
+        document.getElementById('modalCertType').value = 'all';
+        document.getElementById('signModal').classList.add('open');
+      }
+
       function showSignModalBatch(files) {
         pendingBatch = true;
         pendingFilesList = files;
@@ -500,6 +520,7 @@
         document.getElementById('signModal').classList.remove('open');
         pendingFile = null;
         pendingFileGitHub = null;
+        pendingFileSinSettings = null;
         pendingBatch = false;
         pendingFilesList = [];
       }
@@ -514,6 +535,10 @@
           const file = pendingFileGitHub;
           hideSignModal();
           await doSignGitHub(file, '', certificateType);
+        } else if (pendingFileSinSettings) {
+          const file = pendingFileSinSettings;
+          hideSignModal();
+          await doSignSinSettings(file, '', certificateType);
         } else {
           const file = pendingFile;
           hideSignModal();
@@ -586,6 +611,86 @@
         console.log('Plain:', data.uri_plain);
 
          showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + '...', 'info');
+
+        const start = Date.now();
+        let fallbackTriggered = false;
+        const timer = setTimeout(function () {
+          if (fallbackTriggered) return;
+          if (Date.now() - start < VISIBILITY_GRACE_MS && document.visibilityState === 'visible') {
+            fallbackTriggered = true;
+            window.location.href = FALLBACK_URL;
+          }
+        }, FALLBACK_DELAY_MS);
+
+        function cancelFallback() {
+          if (!fallbackTriggered) { clearTimeout(timer); fallbackTriggered = true; }
+        }
+        document.addEventListener('visibilitychange', function onVis() {
+          if (document.visibilityState === 'hidden') cancelFallback();
+        }, { once: true });
+        window.addEventListener('pagehide', cancelFallback, { once: true });
+        window.addEventListener('blur', cancelFallback, { once: true });
+
+        window.location.href = deepLink;
+
+        startPolling(selectedFile, 60);
+      }
+
+      // ===== FIRMAR SIN SETTINGS (doc_prueba3.pdf) =====
+      async function doSignSinSettings(selectedFile, userToken, certificateType) {
+        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
+
+        const btn = document.querySelector('.btn-sign-nosettings[data-file="' + escapeAttr(selectedFile) + '"]');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
+        showStatus('Obteniendo URI de firma (sin settings) para ' + selectedFile + '...', 'info');
+
+        let data;
+        try {
+          const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              configuration: {
+                signature_type: 'basic',
+                signature_reason: 'Acepto el contenido del documento',
+                generate_request: 'NOMBRE EMPRESA',
+                certificate_type: certificateType
+              },
+              token: userToken,
+              documents: [{
+                file: selectedFile, user_id: 'USER123', doc_sha256: ''
+              }]
+            }),
+            credentials: 'same-origin'
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || 'HTTP ' + resp.status);
+          }
+          data = await resp.json();
+        } catch (err) {
+          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
+          return;
+        }
+
+        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+
+        // Usar URI encriptada para el deep link: firmeasy://sign?data=BLOB
+        const encryptedBlob = data.uri_encrypted || data.data;
+        const deepLink = 'firmeasy://sign?data=' + encodeURIComponent(encryptedBlob);
+
+        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
+        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        deepLinkDisplay.style.display = 'block';
+
+        console.log('=== FIRMEASY DEEP LINK (SIN SETTINGS) ===');
+        console.log('Encrypted:', deepLink);
+        console.log('Plain:', data.uri_plain);
+
+        showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + ' (sin settings)...', 'info');
 
         const start = Date.now();
         let fallbackTriggered = false;
