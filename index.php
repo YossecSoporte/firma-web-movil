@@ -70,6 +70,8 @@
     .btn-sign-github:hover:not(:disabled) { background: #5a32a3; }
     .btn-sign-nosettings { background: #e83e8c; color: #fff; }
     .btn-sign-nosettings:hover:not(:disabled) { background: #d02f77; }
+    .btn-sign-image-only { background: #6c757d; color: #fff; }
+    .btn-sign-image-only:hover:not(:disabled) { background: #5a6268; }
     .btn-sign-batch { background: #fd7e14; color: #fff; }
     .btn-sign-batch:hover:not(:disabled) { background: #e06a0d; }
     .btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
@@ -410,6 +412,9 @@
               +   (f.filename === 'doc_prueba3.pdf'
                     ? '<button class="btn-action btn-sign-nosettings" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar sin settings</button>'
                     : '')
+              +   (f.filename === 'doc_prueba4.pdf'
+                    ? '<button class="btn-action btn-sign-image-only" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar solo imagen</button>'
+                    : '')
               +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver firmado</button>')
@@ -434,6 +439,9 @@
               +   (f.filename === 'doc_prueba3.pdf'
                     ? '<button class="btn-action btn-sign-nosettings" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar sin settings</button>'
                     : '')
+              +   (f.filename === 'doc_prueba4.pdf'
+                    ? '<button class="btn-action btn-sign-image-only" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar solo imagen</button>'
+                    : '')
               +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver PDF firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver PDF firmado</button>')
@@ -448,6 +456,11 @@
           // Listeners Firmar sin settings (doc_prueba3.pdf)
           document.querySelectorAll('.btn-sign-nosettings').forEach(function(btn) {
             btn.addEventListener('click', function() { showSignModalSinSettings(btn.getAttribute('data-file')); });
+          });
+
+          // Listeners Firmar solo imagen (doc_prueba4.pdf)
+          document.querySelectorAll('.btn-sign-image-only').forEach(function(btn) {
+            btn.addEventListener('click', function() { showSignModalSoloImagen(btn.getAttribute('data-file')); });
           });
 
         } catch (err) {
@@ -488,6 +501,7 @@
       let pendingFile = null;
       let pendingFileGitHub = null;
       let pendingFileSinSettings = null;
+      let pendingFileSoloImagen = null;
       let pendingBatch = false;
       let pendingFilesList = [];
 
@@ -509,6 +523,12 @@
         document.getElementById('signModal').classList.add('open');
       }
 
+      function showSignModalSoloImagen(file) {
+        pendingFileSoloImagen = file;
+        document.getElementById('modalCertType').value = 'all';
+        document.getElementById('signModal').classList.add('open');
+      }
+
       function showSignModalBatch(files) {
         pendingBatch = true;
         pendingFilesList = files;
@@ -521,6 +541,7 @@
         pendingFile = null;
         pendingFileGitHub = null;
         pendingFileSinSettings = null;
+        pendingFileSoloImagen = null;
         pendingBatch = false;
         pendingFilesList = [];
       }
@@ -539,6 +560,10 @@
           const file = pendingFileSinSettings;
           hideSignModal();
           await doSignSinSettings(file, '', certificateType);
+        } else if (pendingFileSoloImagen) {
+          const file = pendingFileSoloImagen;
+          hideSignModal();
+          await doSignSoloImagen(file, '', certificateType);
         } else {
           const file = pendingFile;
           hideSignModal();
@@ -691,6 +716,88 @@
         console.log('Plain:', data.uri_plain);
 
         showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + ' (sin settings)...', 'info');
+
+        const start = Date.now();
+        let fallbackTriggered = false;
+        const timer = setTimeout(function () {
+          if (fallbackTriggered) return;
+          if (Date.now() - start < VISIBILITY_GRACE_MS && document.visibilityState === 'visible') {
+            fallbackTriggered = true;
+            window.location.href = FALLBACK_URL;
+          }
+        }, FALLBACK_DELAY_MS);
+
+        function cancelFallback() {
+          if (!fallbackTriggered) { clearTimeout(timer); fallbackTriggered = true; }
+        }
+        document.addEventListener('visibilitychange', function onVis() {
+          if (document.visibilityState === 'hidden') cancelFallback();
+        }, { once: true });
+        window.addEventListener('pagehide', cancelFallback, { once: true });
+        window.addEventListener('blur', cancelFallback, { once: true });
+
+        window.location.href = deepLink;
+
+        startPolling(selectedFile, 60);
+      }
+
+      // ===== FIRMAR SOLO IMAGEN (doc_prueba4.pdf) =====
+      async function doSignSoloImagen(selectedFile, userToken, certificateType) {
+        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
+
+        const GRAPHIC_URL = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTlcZ50Ci9uRJBet3r17ORbbDGEq-adGoaPS5Hm8L07qD_okGo9F6URTWE&s=10';
+
+        const btn = document.querySelector('.btn-sign-image-only[data-file="' + escapeAttr(selectedFile) + '"]');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
+        showStatus('Obteniendo URI de firma (solo imagen) para ' + selectedFile + '...', 'info');
+
+        let data;
+        try {
+          const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              configuration: {
+                signature_type: 'basic',
+                signature_reason: 'Acepto el contenido del documento',
+                generate_request: 'NOMBRE EMPRESA',
+                certificate_type: certificateType
+              },
+              token: userToken,
+              documents: [{
+                file: selectedFile, user_id: 'USER123', doc_sha256: '',
+                settings: { vis_sig_graphic: GRAPHIC_URL }
+              }]
+            }),
+            credentials: 'same-origin'
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || 'HTTP ' + resp.status);
+          }
+          data = await resp.json();
+        } catch (err) {
+          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
+          return;
+        }
+
+        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+
+        const encryptedBlob = data.uri_encrypted || data.data;
+        const deepLink = 'firmeasy://sign?data=' + encodeURIComponent(encryptedBlob);
+
+        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
+        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        deepLinkDisplay.style.display = 'block';
+
+        console.log('=== FIRMEASY DEEP LINK (SOLO IMAGEN) ===');
+        console.log('Encrypted:', deepLink);
+        console.log('Plain:', data.uri_plain);
+
+        showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + ' (solo imagen)...', 'info');
 
         const start = Date.now();
         let fallbackTriggered = false;
