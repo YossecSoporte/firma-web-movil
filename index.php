@@ -74,6 +74,13 @@
     .btn-sign-image-only:hover:not(:disabled) { background: #5a6268; }
     .btn-sign-img-text { background: #20c997; color: #fff; }
     .btn-sign-img-text:hover:not(:disabled) { background: #17a2b8; }
+
+    .batch-mode-picker {
+      padding: 8px 10px; font-size: .82rem; border: 1px solid #dee2e6;
+      border-left: 0; border-radius: 0 6px 6px 0; background: #fff;
+      color: #495057; cursor: pointer; outline: none;
+    }
+    .batch-mode-picker:focus { border-color: #0066cc; }
     .btn-sign-batch { background: #fd7e14; color: #fff; }
     .btn-sign-batch:hover:not(:disabled) { background: #e06a0d; }
     .btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
@@ -157,11 +164,19 @@
 
     <div class="toolbar">
       <span id="docCount" class="count">Cargando...</span>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button id="btnBatchSign" class="refresh-btn" type="button" disabled>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-          <span id="batchLabel">Firma en bloque</span>
-        </button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <div style="display:flex;gap:0;">
+          <button id="btnBatchSign" class="refresh-btn" type="button" disabled style="border-radius:6px 0 0 6px;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <span id="batchLabel">Firma en bloque</span>
+          </button>
+          <select id="batchMode" class="batch-mode-picker" title="Modo de firma en bloque">
+            <option value="normal">Normal</option>
+            <option value="sin_settings">Sin settings</option>
+            <option value="solo_imagen">Solo imagen</option>
+            <option value="imagen_texto">Imagen + texto</option>
+          </select>
+        </div>
         <button id="btnRefresh" class="refresh-btn" type="button">
         <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
         <span id="refreshLabel">Actualizar</span>
@@ -1061,6 +1076,10 @@
         var pending = getPendingFiles();
         if (pending.length === 0) { showStatus('No hay documentos pendientes.', 'error'); return; }
 
+        var GRAPHIC_URL = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTlcZ50Ci9uRJBet3r17ORbbDGEq-adGoaPS5Hm8L07qD_okGo9F6URTWE&s=10';
+        var SIG_TEXT = 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}';
+        var batchMode = document.getElementById('batchMode').value;
+
         var ICO_WAIT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>';
         var batchLabel = document.getElementById('batchLabel');
         var btnBatch = document.getElementById('btnBatchSign');
@@ -1068,18 +1087,25 @@
         btnBatch.disabled = true;
         batchLabel.textContent = 'Preparando...';
         btnBatch.querySelector('svg').classList.add('spin');
-        showStatus('Generando firma en bloque para ' + pending.length + ' documentos...', 'info');
+        showStatus('Generando firma en bloque (' + batchMode + ') para ' + pending.length + ' documentos...', 'info');
 
         var documents = pending.map(function(file) {
-          return {
-            file: file, user_id: 'USER123', doc_sha256: '',
-            settings: {
+          var doc = { file: file, user_id: 'USER123', doc_sha256: '' };
+          if (batchMode === 'sin_settings') {
+            // sin settings
+          } else if (batchMode === 'solo_imagen') {
+            doc.settings = { vis_sig_graphic: GRAPHIC_URL };
+          } else if (batchMode === 'imagen_texto') {
+            doc.settings = { vis_sig_graphic: GRAPHIC_URL, vis_sig_text: SIG_TEXT };
+          } else {
+            doc.settings = {
               vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
               vis_sig_page: 1, vis_sig_text_size: 10,
-              vis_sig_text: 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}',
-              vis_sig_graphic: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTlcZ50Ci9uRJBet3r17ORbbDGEq-adGoaPS5Hm8L07qD_okGo9F6URTWE&s=10'
-            }
-          };
+              vis_sig_text: SIG_TEXT,
+              vis_sig_graphic: GRAPHIC_URL
+            };
+          }
+          return doc;
         });
 
         var data;
