@@ -21,7 +21,7 @@ if ($documentDir === false) {
     throw new RuntimeException('Directorio document/ no encontrado');
 }
 define('DOCUMENT_DIR', $documentDir);
-define('MAX_FILE_SIZE', 20 * 1024 * 1024); // 20 MB
+define('MAX_FILE_SIZE', 100 * 1024 * 1024); // 100 MB
 
 /**
  * Valida el nombre de archivo (formato, caracteres, path traversal).

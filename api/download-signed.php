@@ -23,7 +23,7 @@ if ($signedDir === false) {
 }
 
 define('SIGNED_DIR', $signedDir);
-define('MAX_FILE_SIZE', 20 * 1024 * 1024);
+define('MAX_FILE_SIZE', 100 * 1024 * 1024);
 
 // CORS
 header('Access-Control-Allow-Origin: *');

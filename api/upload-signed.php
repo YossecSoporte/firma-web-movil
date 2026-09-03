@@ -58,7 +58,7 @@ if ($signedDir === false) {
 }
 
 define('SIGNED_DIR', $signedDir);
-define('MAX_FILE_SIZE', 20 * 1024 * 1024); // 20 MB
+define('MAX_FILE_SIZE', 150 * 1024 * 1024); // 150 MB
 define('MIN_FILE_SIZE', 100);              // 100 bytes mínimo (un PDF válido no es tan chico)
 
 // Obtener parámetros
@@ -116,7 +116,7 @@ if ($bodySize < MIN_FILE_SIZE) {
 
 if ($bodySize > MAX_FILE_SIZE) {
     http_response_code(413);
-    echo json_encode(['error' => 'Archivo demasiado grande. Límite: 20 MB.']);
+    echo json_encode(['error' => 'Archivo demasiado grande. Límite: 150 MB.']);
     exit;
 }
 

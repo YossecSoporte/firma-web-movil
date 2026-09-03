@@ -74,6 +74,8 @@
     .btn-sign-image-only:hover:not(:disabled) { background: #5a6268; }
     .btn-sign-img-text { background: #20c997; color: #fff; }
     .btn-sign-img-text:hover:not(:disabled) { background: #17a2b8; }
+    .btn-sign-todas-hojas { background: #ff6b6b; color: #fff; }
+    .btn-sign-todas-hojas:hover:not(:disabled) { background: #e05555; }
 
     .batch-mode-picker {
       padding: 8px 10px; font-size: .82rem; border: 1px solid #dee2e6;
@@ -175,6 +177,7 @@
             <option value="sin_settings">Sin settings</option>
             <option value="solo_imagen">Solo imagen</option>
             <option value="imagen_texto">Imagen + texto</option>
+            <option value="todas_hojas">Todas las hojas</option>
           </select>
         </div>
         <button id="btnRefresh" class="refresh-btn" type="button">
@@ -423,19 +426,22 @@
               + '<td class="doc-name">' + escapeHtml(f.filename) + '</td>'
               + '<td class="doc-size">' + formatBytes(f.size) + '</td>'
               + '<td>' + (isSigned ? '<span class="doc-status status-signed">Firmado</span>' : '<span class="doc-status status-pending">Pendiente</span>') + '</td>'
-              + '<td><div class="actions">'
-              +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
-              +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
-              +   (f.filename === 'doc_prueba3.pdf'
-                    ? '<button class="btn-action btn-sign-nosettings" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar sin settings</button>'
-                    : '')
-              +   (f.filename === 'doc_prueba4.pdf'
-                    ? '<button class="btn-action btn-sign-image-only" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar solo imagen</button>'
-                    : '')
-              +   (f.filename === 'doc_prueba5.pdf'
-                    ? '<button class="btn-action btn-sign-img-text" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar imagen+texto</button>'
-                    : '')
-              +   (isSigned
+          + '<td><div class="actions">'
+          +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
+          +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
+          +   (f.filename === 'doc_prueba3.pdf'
+                ? '<button class="btn-action btn-sign-nosettings" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar sin settings</button>'
+                : '')
+          +   (f.filename === 'doc_prueba4.pdf'
+                ? '<button class="btn-action btn-sign-image-only" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar solo imagen</button>'
+                : '')
+          +   (f.filename === 'doc_prueba5.pdf'
+                ? '<button class="btn-action btn-sign-img-text" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar imagen+texto</button>'
+                : '')
+          +   (f.filename === 'doc_prueba6.pdf' || f.filename === 'doc_prueba7.pdf'
+                ? '<button class="btn-action btn-sign-todas-hojas" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar todas las hojas</button>'
+                : '')
+          +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver firmado</button>')
               + '</div></td></tr>';
@@ -453,19 +459,22 @@
               +   '<div><div class="dc-name">' + escapeHtml(f.filename) + '</div><div class="dc-meta">' + formatBytes(f.size) + '</div></div>'
               +   (isSigned ? '<span class="doc-status status-signed">Firmado</span>' : '<span class="doc-status status-pending">Pendiente</span>')
               + '</div>'
-              + '<div class="dc-actions">'
-              +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
-              +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
-              +   (f.filename === 'doc_prueba3.pdf'
-                    ? '<button class="btn-action btn-sign-nosettings" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar sin settings</button>'
-                    : '')
-              +   (f.filename === 'doc_prueba4.pdf'
-                    ? '<button class="btn-action btn-sign-image-only" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar solo imagen</button>'
-                    : '')
-              +   (f.filename === 'doc_prueba5.pdf'
-                    ? '<button class="btn-action btn-sign-img-text" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar imagen+texto</button>'
-                    : '')
-              +   (isSigned
+          + '<div class="dc-actions">'
+          +   '<a class="btn-action btn-view" href="' + viewUrl + '" target="_blank" rel="noopener">' + ICO_VIEW + ' Ver PDF</a>'
+          +   '<button class="btn-action btn-sign" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar</button>'
+          +   (f.filename === 'doc_prueba3.pdf'
+                ? '<button class="btn-action btn-sign-nosettings" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar sin settings</button>'
+                : '')
+          +   (f.filename === 'doc_prueba4.pdf'
+                ? '<button class="btn-action btn-sign-image-only" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar solo imagen</button>'
+                : '')
+          +   (f.filename === 'doc_prueba5.pdf'
+                ? '<button class="btn-action btn-sign-img-text" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar imagen+texto</button>'
+                : '')
+          +   (f.filename === 'doc_prueba6.pdf' || f.filename === 'doc_prueba7.pdf'
+                ? '<button class="btn-action btn-sign-todas-hojas" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar todas las hojas</button>'
+                : '')
+          +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver PDF firmado</a>'
                     : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver PDF firmado</button>')
               + '</div></div>';
@@ -489,6 +498,11 @@
           // Listeners Firmar imagen+texto (doc_prueba5.pdf)
           document.querySelectorAll('.btn-sign-img-text').forEach(function(btn) {
             btn.addEventListener('click', function() { showSignModalImgText(btn.getAttribute('data-file')); });
+          });
+
+          // Listeners Firmar todas las hojas (doc_prueba6.pdf)
+          document.querySelectorAll('.btn-sign-todas-hojas').forEach(function(btn) {
+            btn.addEventListener('click', function() { showSignModalTodasHojas(btn.getAttribute('data-file')); });
           });
 
         } catch (err) {
@@ -531,6 +545,7 @@
       let pendingFileSinSettings = null;
       let pendingFileSoloImagen = null;
       let pendingFileImgText = null;
+      let pendingFileTodasHojas = null;
       let pendingBatch = false;
       let pendingFilesList = [];
 
@@ -564,6 +579,12 @@
         document.getElementById('signModal').classList.add('open');
       }
 
+      function showSignModalTodasHojas(file) {
+        pendingFileTodasHojas = file;
+        document.getElementById('modalCertType').value = 'all';
+        document.getElementById('signModal').classList.add('open');
+      }
+
       function showSignModalBatch(files) {
         pendingBatch = true;
         pendingFilesList = files;
@@ -578,6 +599,7 @@
         pendingFileSinSettings = null;
         pendingFileSoloImagen = null;
         pendingFileImgText = null;
+        pendingFileTodasHojas = null;
         pendingBatch = false;
         pendingFilesList = [];
       }
@@ -604,6 +626,10 @@
           const file = pendingFileImgText;
           hideSignModal();
           await doSignImgText(file, '', certificateType);
+        } else if (pendingFileTodasHojas) {
+          const file = pendingFileTodasHojas;
+          hideSignModal();
+          await doSignTodasHojas(file, '', certificateType);
         } else {
           const file = pendingFile;
           hideSignModal();
@@ -946,6 +972,89 @@
         startPolling(selectedFile, 60);
       }
 
+      // ===== FIRMAR TODAS LAS HOJAS (doc_prueba6.pdf) =====
+      async function doSignTodasHojas(selectedFile, userToken, certificateType) {
+        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
+
+        const GRAPHIC_URL = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTlcZ50Ci9uRJBet3r17ORbbDGEq-adGoaPS5Hm8L07qD_okGo9F6URTWE&s=10';
+        const SIG_TEXT = 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}';
+
+        const btn = document.querySelector('.btn-sign-todas-hojas[data-file="' + escapeAttr(selectedFile) + '"]');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
+        showStatus('Obteniendo URI de firma (todas las hojas) para ' + selectedFile + '...', 'info');
+
+        let data;
+        try {
+          const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              configuration: {
+                signature_type: 'basic',
+                signature_reason: 'Acepto el contenido del documento',
+                generate_request: 'NOMBRE EMPRESA',
+                certificate_type: certificateType
+              },
+              token: userToken,
+              documents: [{
+                file: selectedFile, user_id: 'USER123', doc_sha256: '',
+                settings: { vis_sig_page: -1, vis_sig_text: SIG_TEXT, vis_sig_graphic: GRAPHIC_URL }
+              }]
+            }),
+            credentials: 'same-origin'
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || 'HTTP ' + resp.status);
+          }
+          data = await resp.json();
+        } catch (err) {
+          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
+          return;
+        }
+
+        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+
+        const encryptedBlob = data.uri_encrypted || data.data;
+        const deepLink = 'firmeasy://sign?data=' + encodeURIComponent(encryptedBlob);
+
+        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
+        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        deepLinkDisplay.style.display = 'block';
+
+        console.log('=== FIRMEASY DEEP LINK (TODAS LAS HOJAS) ===');
+        console.log('Encrypted:', deepLink);
+        console.log('Plain:', data.uri_plain);
+
+        showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + ' (todas las hojas)...', 'info');
+
+        const start = Date.now();
+        let fallbackTriggered = false;
+        const timer = setTimeout(function () {
+          if (fallbackTriggered) return;
+          if (Date.now() - start < VISIBILITY_GRACE_MS && document.visibilityState === 'visible') {
+            fallbackTriggered = true;
+            window.location.href = FALLBACK_URL;
+          }
+        }, FALLBACK_DELAY_MS);
+
+        function cancelFallback() {
+          if (!fallbackTriggered) { clearTimeout(timer); fallbackTriggered = true; }
+        }
+        document.addEventListener('visibilitychange', function onVis() {
+          if (document.visibilityState === 'hidden') cancelFallback();
+        }, { once: true });
+        window.addEventListener('pagehide', cancelFallback, { once: true });
+        window.addEventListener('blur', cancelFallback, { once: true });
+
+        window.location.href = deepLink;
+
+        startPolling(selectedFile, 60);
+      }
+
       // ===== FIRMAR GITHUB =====
       async function doSignGitHub(selectedFile, userToken, certificateType) {
         if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
@@ -1097,6 +1206,8 @@
             doc.settings = { vis_sig_graphic: GRAPHIC_URL };
           } else if (batchMode === 'imagen_texto') {
             doc.settings = { vis_sig_graphic: GRAPHIC_URL, vis_sig_text: SIG_TEXT };
+          } else if (batchMode === 'todas_hojas') {
+            doc.settings = { vis_sig_page: -1, vis_sig_text: SIG_TEXT, vis_sig_graphic: GRAPHIC_URL };
           } else {
             doc.settings = {
               vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
