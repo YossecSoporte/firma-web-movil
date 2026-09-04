@@ -116,14 +116,17 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
     $contentType = $opts['contentType'] ?? 'application/octet-stream';
 
     $url = _blobApiUrl('/?pathname=' . rawurlencode($path));
+    $requestId = bin2hex(random_bytes(16));
     $headers = array_merge(_blobAuthHeaders(), [
         'x-vercel-blob-access: private',
         'x-content-type: ' . $contentType,
         'Content-Length: ' . strlen($data),
         'x-add-random-suffix: ' . $addSuffix,
+        'x-api-blob-request-id: ' . $requestId,
+        'x-api-blob-request-attempt: 0',
     ]);
 
-    // Intentar con curl primero (POST, como el SDK oficial)
+    // Intentar con curl primero (PUT, como el SDK oficial)
     $resp = false;
     $code = 0;
     $err = '';
@@ -131,7 +134,7 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
+            CURLOPT_CUSTOMREQUEST  => 'PUT',
             CURLOPT_POSTFIELDS     => $data,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER     => $headers,
@@ -145,14 +148,11 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
 
     // Fallback: stream_context_create si curl falló o no existe
     if ($resp === false || $code === 0) {
-        $headerStr = implode("\r\n", array_map(function($h) {
-            $parts = explode(': ', $h, 2);
-            return $parts[0] . ': ' . ($parts[1] ?? '');
-        }, $headers));
+        $headerStr = implode("\r\n", $headers);
 
         $ctx = stream_context_create([
             'http' => [
-                'method'  => 'POST',
+                'method'  => 'PUT',
                 'header'  => $headerStr,
                 'content' => $data,
                 'timeout' => 15,
@@ -161,7 +161,6 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
         ]);
         $resp = @file_get_contents($url, false, $ctx);
         if ($resp !== false && isset($http_response_header)) {
-            // Extraer status code del primer header
             if (preg_match('/HTTP\/\d\.\d\s+(\d+)/', $http_response_header[0], $m)) {
                 $code = (int)$m[1];
             }
