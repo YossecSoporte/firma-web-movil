@@ -116,23 +116,58 @@ function blobPut(string $path, string $data, array $opts = []): array|false {
     $contentType = $opts['contentType'] ?? 'application/octet-stream';
 
     $url = _blobApiUrl('/?pathname=' . rawurlencode($path));
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_CUSTOMREQUEST  => 'PUT',
-        CURLOPT_POSTFIELDS     => $data,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => array_merge(_blobAuthHeaders(), [
-            'x-vercel-blob-access: private',
-            'x-content-type: ' . $contentType,
-            'Content-Length: ' . strlen($data),
-            'x-add-random-suffix: ' . $addSuffix,
-        ]),
-        CURLOPT_TIMEOUT        => 30,
+    $headers = array_merge(_blobAuthHeaders(), [
+        'x-vercel-blob-access: private',
+        'x-content-type: ' . $contentType,
+        'Content-Length: ' . strlen($data),
+        'x-add-random-suffix: ' . $addSuffix,
     ]);
-    $resp = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $err  = curl_error($ch);
-    curl_close($ch);
+
+    // Intentar con curl primero (POST, como el SDK oficial)
+    $resp = false;
+    $code = 0;
+    $err = '';
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $data,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_TIMEOUT        => 15,
+        ]);
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch);
+        curl_close($ch);
+    }
+
+    // Fallback: stream_context_create si curl falló o no existe
+    if ($resp === false || $code === 0) {
+        $headerStr = implode("\r\n", array_map(function($h) {
+            $parts = explode(': ', $h, 2);
+            return $parts[0] . ': ' . ($parts[1] ?? '');
+        }, $headers));
+
+        $ctx = stream_context_create([
+            'http' => [
+                'method'  => 'POST',
+                'header'  => $headerStr,
+                'content' => $data,
+                'timeout' => 15,
+                'ignore_errors' => true,
+            ]
+        ]);
+        $resp = @file_get_contents($url, false, $ctx);
+        if ($resp !== false && isset($http_response_header)) {
+            // Extraer status code del primer header
+            if (preg_match('/HTTP\/\d\.\d\s+(\d+)/', $http_response_header[0], $m)) {
+                $code = (int)$m[1];
+            }
+        }
+        $err = $resp === false ? (error_get_last()['message'] ?? 'stream failed') : '';
+    }
 
     if ($code >= 200 && $code < 300) {
         $json = json_decode($resp, true);

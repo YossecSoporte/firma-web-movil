@@ -46,6 +46,10 @@
     "api/generar-job.php": {
       "runtime": "vercel-php@0.7.4",
       "maxDuration": 10
+    },
+    "api/test-outbound.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
     }
   },
   "rewrites": [
