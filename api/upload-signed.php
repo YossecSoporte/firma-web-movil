@@ -6,34 +6,24 @@
  * Recibe un PDF firmado desde la app móvil FirmEasy en formato binario (raw body)
  * y lo guarda en document/signed/
  *
- * Uso:
- *   POST /api/upload-signed.php?file=nombre.pdf&user_id=USER123
- *   Content-Type: application/pdf   (o application/octet-stream)
- *   Body: <bytes del PDF>
- *
- * Respuesta (200):
- * {
- *   "success": true,
- *   "filename": "doc_prueba1_USER123.pdf",
- *   "size": 30541
- * }
- *
  * Parámetros (query string):
- *   - file:    nombre del archivo PDF original (ej. doc_prueba1.pdf)
- *   - user_id: identificador del usuario (ej. USER123)
+ *   - file:          nombre del archivo PDF original
+ *   - user_id:       identificador del usuario
+ *   - job:           UUID del job (opcional)
+ *   - document_code: UUID del documento (opcional)
  *
  * Seguridad:
- *   - Solo POST
+ *   - Bearer token validado contra job token (si job_id proporcionado)
  *   - Valida nombre de archivo (sin path traversal)
  *   - Solo extensión .pdf
- *   - Máximo 20 MB
+ *   - Máximo 150 MB
  *   - Valida magic bytes %PDF
  */
 
 // CORS
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
@@ -49,7 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Configuración
 $signedDir = realpath(__DIR__ . '/../document/signed');
 if ($signedDir === false) {
-    // Crear el directorio si no existe
     $signedDir = __DIR__ . '/../document/signed';
     if (!is_dir($signedDir)) {
         mkdir($signedDir, 0755, true);
@@ -58,12 +47,14 @@ if ($signedDir === false) {
 }
 
 define('SIGNED_DIR', $signedDir);
-define('MAX_FILE_SIZE', 150 * 1024 * 1024); // 150 MB
-define('MIN_FILE_SIZE', 100);              // 100 bytes mínimo (un PDF válido no es tan chico)
+define('MAX_FILE_SIZE', 150 * 1024 * 1024);
+define('MIN_FILE_SIZE', 100);
 
 // Obtener parámetros
 $requestedFile = $_GET['file'] ?? '';
 $userId        = $_GET['user_id'] ?? '';
+$jobId         = $_GET['job'] ?? '';
+$documentCode  = $_GET['document_code'] ?? '';
 
 if (empty($requestedFile)) {
     http_response_code(400);
@@ -77,7 +68,26 @@ if (empty($userId)) {
     exit;
 }
 
-// Validar nombre de archivo (solo caracteres seguros, sin path traversal)
+// Validar Bearer token
+$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+$bearerToken = '';
+if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
+    $bearerToken = $m[1];
+}
+
+if (!empty($bearerToken) && !empty($jobId) && preg_match('/^[a-f0-9-]{36}$/i', $jobId)) {
+    $jobFile = __DIR__ . '/../storage/jobs/' . $jobId . '.json';
+    if (file_exists($jobFile)) {
+        $jobData = json_decode(file_get_contents($jobFile), true);
+        if ($jobData && ($jobData['token'] ?? '') !== $bearerToken) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Token inválido.']);
+            exit;
+        }
+    }
+}
+
+// Validar nombre de archivo
 if (!preg_match('/^[a-zA-Z0-9._-]+$/', $requestedFile) || str_contains($requestedFile, '..')) {
     http_response_code(400);
     echo json_encode(['error' => 'Nombre de archivo inválido.']);
@@ -91,14 +101,14 @@ if (!preg_match('/\.pdf$/i', $requestedFile)) {
     exit;
 }
 
-// Validar user_id (solo caracteres seguros)
+// Validar user_id
 if (!preg_match('/^[a-zA-Z0-9._-]+$/', $userId)) {
     http_response_code(400);
     echo json_encode(['error' => 'user_id inválido.']);
     exit;
 }
 
-// Leer body en binario (raw)
+// Leer body en binario
 $rawBody = file_get_contents('php://input');
 if ($rawBody === false || $rawBody === '') {
     http_response_code(400);
@@ -120,14 +130,14 @@ if ($bodySize > MAX_FILE_SIZE) {
     exit;
 }
 
-// Validar magic bytes de PDF (%PDF-)
+// Validar magic bytes
 if (substr($rawBody, 0, 5) !== '%PDF-') {
     http_response_code(400);
     echo json_encode(['error' => 'El contenido no es un PDF válido (magic bytes %PDF- no encontrado).']);
     exit;
 }
 
-// Construir nombre del archivo firmado: {nombre_base}_{user_id}.pdf
+// Construir nombre del archivo firmado
 $baseName = preg_replace('/\.pdf$/i', '', $requestedFile);
 $signedFileName = $baseName . '_' . $userId . '.pdf';
 $signedFilePath = SIGNED_DIR . '/' . $signedFileName;
@@ -142,12 +152,100 @@ if ($bytesWritten === false) {
 
 // Respuesta exitosa
 header('Content-Type: application/json; charset=utf-8');
-echo json_encode([
+$response = [
     'success' => true,
     'filename' => $signedFileName,
     'original' => $requestedFile,
     'user_id' => $userId,
     'size' => $bytesWritten
-], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+];
+
+// Actualizar estado del documento en el job y enviar callback
+if (!empty($jobId) && !empty($documentCode)) {
+    $jobFile = __DIR__ . '/../storage/jobs/' . $jobId . '.json';
+    if (file_exists($jobFile)) {
+        $jobData = json_decode(file_get_contents($jobFile), true);
+
+        // Actualizar estado del documento
+        foreach ($jobData['documents'] as &$doc) {
+            if (($doc['document_code'] ?? '') === $documentCode) {
+                $doc['status'] = 'signed';
+                $doc['signed_at'] = date('c');
+                break;
+            }
+        }
+        unset($doc);
+
+        // Guardar job actualizado
+        file_put_contents($jobFile, json_encode($jobData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+        // Verificar si todos los documentos están procesados
+        $allDone = true;
+        $callbackData = [];
+        $anyError = false;
+        foreach ($jobData['documents'] as $doc) {
+            if ($doc['status'] === 'pending') {
+                $allDone = false;
+                break;
+            }
+            $docEntry = [
+                'document_code' => $doc['document_code'],
+                'name_pdf' => $doc['name_pdf'],
+                'status' => $doc['status'],
+            ];
+            if ($doc['status'] === 'signed') {
+                $docEntry['message'] = 'Firmado exitosamente';
+            } else {
+                $docEntry['status'] = 'error';
+                $docEntry['error_code'] = $doc['error_code'] ?? 'SIGN_ERROR';
+                $docEntry['message'] = $doc['message'] ?? 'Error al firmar';
+                $anyError = true;
+            }
+            $callbackData[] = $docEntry;
+        }
+
+        // Enviar callback si todos están procesados
+        if ($allDone && !empty($jobData['callback'])) {
+            if ($anyError) {
+                sendCallback($jobData['callback'], $jobData['token'], $jobId, false, 422, 'Uno o más documentos no pudieron firmarse', $callbackData);
+            } else {
+                sendCallback($jobData['callback'], $jobData['token'], $jobId, true, 200, 'PDF firmado exitosamente', $callbackData);
+            }
+        }
+    }
+}
+
+echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
 exit;
+
+/**
+ * Envía el callback al integrador
+ */
+function sendCallback(string $callbackUrl, string $token, string $jobId, bool $success, int $code, string $message, array $data): void
+{
+    $callbackPayload = [
+        'success' => $success,
+        'code' => $code,
+        'message' => $message,
+        'job' => $jobId,
+        'data' => $data
+    ];
+
+    $url = $callbackUrl . (str_contains($callbackUrl, '?') ? '&' : '?') . 'token=' . rawurlencode($token);
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($callbackPayload),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $token,
+            'X-Job-Id: ' . $jobId,
+        ],
+        CURLOPT_TIMEOUT        => 10,
+    ]);
+    curl_exec($ch);
+    curl_close($ch);
+}

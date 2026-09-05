@@ -3,11 +3,14 @@
     "signature_type": "basic",
     "signature_reason": "Acepto el contenido del documento",
     "generate_request": "NOMBRE EMPRESA",
-    "certificate_type": "all"
+    "certificate_type": "all",
+    "purpose": "signing",
+    "accepted_issuers": ["CN=AC RAIZ001, O=RENIEC, C=PE"]
   },
-  "token": "TOKEN_DE_PRUEBA_123",
+  "token": "tkn_bat_4kyVd04obKkRqL3GSglYz2TAur4JUH1c",
   "documents": [
     {
+      "document_code": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
       "file": "doc_prueba1.pdf",
       "user_id": "USER123",
       "doc_sha256": "D5076E6E6AB7062B8FD7380E1E105214D482FA0876B2ABC9B1A2BADC0D4585D4",
@@ -23,5 +26,6 @@
         "vis_sig_graphic": "http://imagen-firma.com/logo.png"
       }
     }
-  ]
+  ],
+  "callback": "http://localhost:8081/callback"
 }

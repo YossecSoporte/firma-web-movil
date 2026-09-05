@@ -300,6 +300,8 @@
       const DOWNLOAD_SIGNED_URL = '/api/download-signed.php';
       const CLEAR_SIGNED_URL    = '/api/clear-signed.php';
       const ACTION              = 'sign';
+      const CALLBACK_URL     = '/api/callback.php';
+      const CALLBACK_ENDPOINT = window.location.origin + '/api/callback.php';
       const FALLBACK_URL        = 'app-no-instalada.php';
       const FALLBACK_DELAY_MS   = 3500;
       const VISIBILITY_GRACE_MS = 5000;
@@ -331,29 +333,53 @@
         statusBar.style.display = msg ? 'block' : 'none';
       }
 
-      function startPolling(selectedFile, timeoutSec) {
+      function startPolling(selectedFile, timeoutSec, jobId) {
         if (pollingTimer) clearInterval(pollingTimer);
         showStatus('Firma en progreso... vuelve a esta pestaña al terminar.', 'info');
         const max = (timeoutSec || 60) * 1000;
         const start = Date.now();
         pollingTimer = setInterval(function () {
-          fetch(LIST_SIGNED_URL + '?original=' + encodeURIComponent(selectedFile), { credentials: 'same-origin' })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-              if (data.success && data.files && data.files.length > 0) {
-                clearInterval(pollingTimer);
-                pollingTimer = null;
-                showStatus('PDF firmado detectado. Actualizando lista...', 'success');
-                setTimeout(function () { showStatus('', 'info'); }, 3000);
-                loadPdfList();
-              } else if (Date.now() - start > max) {
-                clearInterval(pollingTimer);
-                pollingTimer = null;
-                showStatus('Tiempo de espera agotado. Recarga manual si el PDF está firmado.', 'error');
-                setTimeout(function () { showStatus('', 'info'); }, 5000);
-              }
-            })
-            .catch(function () { /* retry */ });
+          var callbackCheck = jobId
+            ? fetch(CALLBACK_URL + '?job=' + encodeURIComponent(jobId), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (cb) {
+                  if (cb.received && !cb.success) {
+                    clearInterval(pollingTimer);
+                    pollingTimer = null;
+                    var msg = cb.message || 'Error al procesar documento';
+                    showStatus('Error: ' + msg, 'error');
+                    setTimeout(function () { showStatus('', 'info'); }, 8000);
+                  } else if (cb.received && cb.success) {
+                    clearInterval(pollingTimer);
+                    pollingTimer = null;
+                    showStatus('PDF firmado detectado. Actualizando lista...', 'success');
+                    setTimeout(function () { showStatus('', 'info'); }, 3000);
+                    loadPdfList();
+                  }
+                })
+                .catch(function () { /* retry */ })
+            : Promise.resolve();
+
+          callbackCheck.then(function () {
+            if (pollingTimer === null) return;
+            return fetch(LIST_SIGNED_URL + '?original=' + encodeURIComponent(selectedFile), { credentials: 'same-origin' })
+              .then(function (r) { return r.json(); })
+              .then(function (data) {
+                if (data.success && data.files && data.files.length > 0) {
+                  clearInterval(pollingTimer);
+                  pollingTimer = null;
+                  showStatus('PDF firmado detectado. Actualizando lista...', 'success');
+                  setTimeout(function () { showStatus('', 'info'); }, 3000);
+                  loadPdfList();
+                } else if (Date.now() - start > max) {
+                  clearInterval(pollingTimer);
+                  pollingTimer = null;
+                  showStatus('Tiempo de espera agotado. Recarga manual si el PDF está firmado.', 'error');
+                  setTimeout(function () { showStatus('', 'info'); }, 5000);
+                }
+              })
+              .catch(function () { /* retry */ });
+          });
         }, 5000);
       }
 
@@ -660,10 +686,14 @@
                 signature_type: 'basic',
                 signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType
+                certificate_type: certificateType,
+                purpose: 'signing',
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
               },
               token: userToken,
+              callback: CALLBACK_ENDPOINT,
               documents: [{
+                document_code: crypto.randomUUID(),
                 file: selectedFile, user_id: 'USER123', doc_sha256: '',
                 settings: {
                   vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
@@ -694,7 +724,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK ===');
@@ -724,7 +754,7 @@
 
         window.location.href = deepLink;
 
-        startPolling(selectedFile, 60);
+        startPolling(selectedFile, 60, data.job);
       }
 
       // ===== FIRMAR SIN SETTINGS (doc_prueba3.pdf) =====
@@ -746,10 +776,14 @@
                 signature_type: 'basic',
                 signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType
+                certificate_type: certificateType,
+                purpose: 'signing',
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
               },
               token: userToken,
+              callback: CALLBACK_ENDPOINT,
               documents: [{
+                document_code: crypto.randomUUID(),
                 file: selectedFile, user_id: 'USER123', doc_sha256: ''
               }]
             }),
@@ -774,7 +808,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (SIN SETTINGS) ===');
@@ -804,7 +838,7 @@
 
         window.location.href = deepLink;
 
-        startPolling(selectedFile, 60);
+        startPolling(selectedFile, 60, data.job);
       }
 
       // ===== FIRMAR SOLO IMAGEN (doc_prueba4.pdf) =====
@@ -828,10 +862,14 @@
                 signature_type: 'basic',
                 signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType
+                certificate_type: certificateType,
+                purpose: 'signing',
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
               },
               token: userToken,
+              callback: CALLBACK_ENDPOINT,
               documents: [{
+                document_code: crypto.randomUUID(),
                 file: selectedFile, user_id: 'USER123', doc_sha256: '',
                 settings: { vis_sig_graphic: GRAPHIC_URL }
               }]
@@ -856,7 +894,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (SOLO IMAGEN) ===');
@@ -886,7 +924,7 @@
 
         window.location.href = deepLink;
 
-        startPolling(selectedFile, 60);
+        startPolling(selectedFile, 60, data.job);
       }
 
       // ===== FIRMAR IMAGEN+TEXTO (doc_prueba5.pdf) =====
@@ -911,10 +949,14 @@
                 signature_type: 'basic',
                 signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType
+                certificate_type: certificateType,
+                purpose: 'signing',
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
               },
               token: userToken,
+              callback: CALLBACK_ENDPOINT,
               documents: [{
+                document_code: crypto.randomUUID(),
                 file: selectedFile, user_id: 'USER123', doc_sha256: '',
                 settings: { vis_sig_graphic: GRAPHIC_URL, vis_sig_text: SIG_TEXT }
               }]
@@ -939,7 +981,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (IMAGEN+TEXTO) ===');
@@ -969,7 +1011,7 @@
 
         window.location.href = deepLink;
 
-        startPolling(selectedFile, 60);
+        startPolling(selectedFile, 60, data.job);
       }
 
       // ===== FIRMAR TODAS LAS HOJAS (doc_prueba6.pdf) =====
@@ -994,10 +1036,14 @@
                 signature_type: 'basic',
                 signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType
+                certificate_type: certificateType,
+                purpose: 'signing',
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
               },
               token: userToken,
+              callback: CALLBACK_ENDPOINT,
               documents: [{
+                document_code: crypto.randomUUID(),
                 file: selectedFile, user_id: 'USER123', doc_sha256: '',
                 settings: { vis_sig_page: -1, vis_sig_text: SIG_TEXT, vis_sig_graphic: GRAPHIC_URL }
               }]
@@ -1022,7 +1068,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (TODAS LAS HOJAS) ===');
@@ -1052,7 +1098,7 @@
 
         window.location.href = deepLink;
 
-        startPolling(selectedFile, 60);
+        startPolling(selectedFile, 60, data.job);
       }
 
       // ===== FIRMAR GITHUB =====
@@ -1076,10 +1122,14 @@
                 signature_type: 'basic',
                 signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType
+                certificate_type: certificateType,
+                purpose: 'signing',
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
               },
               token: userToken,
+              callback: CALLBACK_ENDPOINT,
               documents: [{
+                document_code: crypto.randomUUID(),
                 file: selectedFile, user_id: 'USER123', doc_sha256: '',
                 data: GITHUB_DATA_URL,
                 settings: {
@@ -1111,7 +1161,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (GITHUB) ===');
@@ -1141,7 +1191,7 @@
 
         window.location.href = deepLink;
 
-        startPolling(selectedFile, 60);
+        startPolling(selectedFile, 60, data.job);
       }
 
       // Wrapper para mantener compatibilidad con onclick directo
@@ -1199,7 +1249,7 @@
         showStatus('Generando firma en bloque (' + batchMode + ') para ' + pending.length + ' documentos...', 'info');
 
         var documents = pending.map(function(file) {
-          var doc = { file: file, user_id: 'USER123', doc_sha256: '' };
+          var doc = { document_code: crypto.randomUUID(), file: file, user_id: 'USER123', doc_sha256: '' };
           if (batchMode === 'sin_settings') {
             // sin settings
           } else if (batchMode === 'solo_imagen') {
@@ -1229,9 +1279,12 @@
                 signature_type: 'basic',
                 signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType
+                certificate_type: certificateType,
+                purpose: 'signing',
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
               },
               token: userToken,
+              callback: CALLBACK_ENDPOINT,
               documents: documents
             }),
             credentials: 'same-origin'
@@ -1258,7 +1311,7 @@
 
         var deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (BLOQUE) ===');
@@ -1289,7 +1342,7 @@
 
         window.location.href = deepLink;
 
-        startPolling(pending[0], 90);
+        startPolling(pending[0], 90, data.job);
       }
 
       // ===== CASOS ESPECIALES DE PRUEBA =====
@@ -1309,10 +1362,14 @@
                 signature_type: 'basic',
                 signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType
+                certificate_type: certificateType,
+                purpose: 'signing',
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
               },
               token: userToken,
+              callback: CALLBACK_ENDPOINT,
               documents: [{
+                document_code: crypto.randomUUID(),
                 file: 'doc_prueba1.pdf', user_id: 'USER123', doc_sha256: '',
                 settings: {
                   vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
@@ -1342,7 +1399,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (IMAGEN ROTA) ===');
@@ -1351,7 +1408,7 @@
 
         showStatus('Abriendo app FirmEasy con imagen rota...', 'info');
         window.location.href = deepLink;
-        startPolling('doc_prueba1.pdf', 60);
+        startPolling('doc_prueba1.pdf', 60, data.job);
       }
 
       async function doSignBadPdf(userToken, certificateType) {
@@ -1370,10 +1427,14 @@
                 signature_type: 'basic',
                 signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType
+                certificate_type: certificateType,
+                purpose: 'signing',
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
               },
               token: userToken,
+              callback: CALLBACK_ENDPOINT,
               documents: [{
+                document_code: crypto.randomUUID(),
                 file: 'doc_prueba1.pdf', user_id: 'USER123', doc_sha256: '',
                 data: 'https://httpbin.org/status/404',  // PDF que falla (404)
                 settings: {
@@ -1404,7 +1465,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType }, documents: data.documents }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (PDF ROTO) ===');
@@ -1413,7 +1474,7 @@
 
         showStatus('Abriendo app FirmEasy con PDF roto...', 'info');
         window.location.href = deepLink;
-        startPolling('doc_prueba1.pdf', 60);
+        startPolling('doc_prueba1.pdf', 60, data.job);
       }
 
       // ===== INIT =====

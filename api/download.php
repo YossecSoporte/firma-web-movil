@@ -23,6 +23,15 @@ if ($documentDir === false) {
 define('DOCUMENT_DIR', $documentDir);
 define('MAX_FILE_SIZE', 100 * 1024 * 1024); // 100 MB
 
+// CORS
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
 /**
  * Valida el nombre de archivo (formato, caracteres, path traversal).
  * Retorna el path esperado si el formato es válido, o false si hay error de validación.
@@ -53,6 +62,29 @@ if (empty($requestedFile)) {
     http_response_code(400);
     echo json_encode(['error' => 'Parámetro "file" es requerido.']);
     exit;
+}
+
+// Validar Bearer token (opcional: si no hay token en job, no valida)
+$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+$bearerToken = '';
+if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
+    $bearerToken = $m[1];
+}
+
+// Si se proporciona Bearer token, validar contra el job
+if (!empty($bearerToken)) {
+    $jobId = $_GET['job'] ?? '';
+    if (!empty($jobId) && preg_match('/^[a-f0-9-]{36}$/i', $jobId)) {
+        $storageFile = __DIR__ . '/../storage/jobs/' . $jobId . '.json';
+        if (file_exists($storageFile)) {
+            $jobData = json_decode(file_get_contents($storageFile), true);
+            if ($jobData && ($jobData['token'] ?? '') !== $bearerToken) {
+                http_response_code(401);
+                echo json_encode(['error' => 'Token inválido.']);
+                exit;
+            }
+        }
+    }
 }
 
 // Validar formato del nombre de archivo

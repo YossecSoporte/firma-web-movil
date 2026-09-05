@@ -140,6 +140,10 @@ if (!in_array($certificateType, ['all', 'dni', 'certificado'], true)) {
     exit;
 }
 
+// Generar job, exp
+$job = generateUuidV4();
+$exp = time() + EXPIRACION_SEGUNDOS;
+
 // Validar y procesar cada documento (soporta 1 o más documentos — firma en bloque)
 $documents = $data['documents'];
 $processedDocs = [];
@@ -148,9 +152,9 @@ foreach ($documents as $idx => $doc) {
     $hasDataUrl = isset($doc['data']) && !empty($doc['data']);
 
     if ($hasDataUrl) {
-        $required = ['user_id'];
+        $required = ['user_id', 'document_code'];
     } else {
-        $required = ['file', 'user_id'];
+        $required = ['file', 'user_id', 'document_code'];
     }
 
     foreach ($required as $field) {
@@ -236,13 +240,15 @@ foreach ($documents as $idx => $doc) {
     } else {
         $fromUrl = $BASE_URL_EXTERNO . '/api/download.php?file=' . rawurlencode($fileName);
     }
-    $toUrl = $BASE_URL_EXTERNO . '/api/upload-signed.php?file=' . rawurlencode($fileName) . '&user_id=' . rawurlencode($userId);
+    $toUrl = $BASE_URL_EXTERNO . '/api/upload-signed.php?file=' . rawurlencode($fileName) . '&user_id=' . rawurlencode($userId) . '&job=' . $job . '&document_code=' . rawurlencode($doc['document_code']);
 
     $processed = [
+        'document_code' => $doc['document_code'],
         'from' => $fromUrl,
         'to' => $toUrl,
         'name_pdf' => $fileName,
-        'doc_sha256' => $docSha256
+        'doc_sha256' => $docSha256,
+        'status' => 'pending'
     ];
     // settings es opcional: solo se incluye si el cliente lo envía
     if (isset($doc['settings']) && is_array($doc['settings'])) {
@@ -251,10 +257,6 @@ foreach ($documents as $idx => $doc) {
     $processedDocs[] = $processed;
 }
 
-// Generar job, exp
-$job = generateUuidV4();
-$exp = time() + EXPIRACION_SEGUNDOS;
-
 // Preparar datos para guardar
 $jobData = [
     'job' => $job,
@@ -262,6 +264,7 @@ $jobData = [
     'token' => $userToken,
     'configuration' => $data['configuration'],
     'documents' => $processedDocs,
+    'callback' => $data['callback'] ?? '',
     'created_at' => time()
 ];
 
@@ -276,7 +279,7 @@ if (!file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHE
 // Construir URI plano (sin nonce, sin kid)
 // Formato: firmeasy://sign?data={DATA_URL}&exp={TS}&token={USER_TOKEN}
 $deepDataUrl = $BASE_URL_EXTERNO . '/api/job/' . $job;
-$plainUri = "firmeasy://sign?data=" . rawurlencode($deepDataUrl) . "&exp=$exp&token=" . rawurlencode($userToken);
+$plainUri = "firmeasy://sign?data=" . rawurlencode($deepDataUrl) . "&exp=$exp";
 
 // Encriptar URI completa
 $encryptedBlob = encryptUri($plainUri, $ENCRYPTION_KEY);
