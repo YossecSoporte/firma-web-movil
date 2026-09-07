@@ -397,6 +397,12 @@
       function escapeAttr(s) { return String(s).replace(/"/g,'"').replace(/'/g,'&#39;').replace(/</g,'<').replace(/>/g,'>'); }
 
       var BATCH_EXCLUDED = ['test.pdf', 'doc_pruebaFirmado.pdf', 'pdf_horizontal.pdf'];
+      function isTodasHojas(fn) {
+        if (fn === 'doc_prueba6.pdf' || fn === 'doc_prueba7.pdf') return true;
+        var m = fn.match(/^doc_prueba(\d+)\.pdf$/);
+        if (m) { var n = parseInt(m[1]); return n >= 10 && n <= 50; }
+        return false;
+      }
 
       // ===== CARGA DE LISTAS =====
       async function loadSignedList() {
@@ -464,8 +470,11 @@
           +   (f.filename === 'doc_prueba5.pdf'
                 ? '<button class="btn-action btn-sign-img-text" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar imagen+texto</button>'
                 : '')
-          +   (f.filename === 'doc_prueba6.pdf' || f.filename === 'doc_prueba7.pdf'
+          +   (isTodasHojas(f.filename)
                 ? '<button class="btn-action btn-sign-todas-hojas" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar todas las hojas</button>'
+                : '')
+          +   (f.filename === 'doc_prueba9.pdf'
+                ? '<button class="btn-action btn-sign-auth" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar (autenticación)</button>'
                 : '')
           +   (isSigned
                     ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver firmado</a>'
@@ -497,12 +506,15 @@
           +   (f.filename === 'doc_prueba5.pdf'
                 ? '<button class="btn-action btn-sign-img-text" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar imagen+texto</button>'
                 : '')
-          +   (f.filename === 'doc_prueba6.pdf' || f.filename === 'doc_prueba7.pdf'
+          +   (isTodasHojas(f.filename)
                 ? '<button class="btn-action btn-sign-todas-hojas" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar todas las hojas</button>'
                 : '')
+          +   (f.filename === 'doc_prueba9.pdf'
+                ? '<button class="btn-action btn-sign-auth" data-file="' + escapeAttr(f.filename) + '">' + ICO_SIGN + ' Firmar (autenticación)</button>'
+                : '')
           +   (isSigned
-                    ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver PDF firmado</a>'
-                    : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver PDF firmado</button>')
+                    ? '<a class="btn-action btn-view-signed" href="' + signedUrl + '" target="_blank" rel="noopener">' + ICO_SIGNED + ' Ver firmado</a>'
+                    : '<button class="btn-action btn-view-signed" disabled>' + ICO_SIGNED + ' Ver firmado</button>')
               + '</div></div>';
           }).join('');
 
@@ -529,6 +541,11 @@
           // Listeners Firmar todas las hojas (doc_prueba6.pdf)
           document.querySelectorAll('.btn-sign-todas-hojas').forEach(function(btn) {
             btn.addEventListener('click', function() { showSignModalTodasHojas(btn.getAttribute('data-file')); });
+          });
+
+          // Listeners Firmar autenticación (doc_prueba9.pdf)
+          document.querySelectorAll('.btn-sign-auth').forEach(function(btn) {
+            btn.addEventListener('click', function() { showSignModalAuth(btn.getAttribute('data-file')); });
           });
 
         } catch (err) {
@@ -572,6 +589,7 @@
       let pendingFileSoloImagen = null;
       let pendingFileImgText = null;
       let pendingFileTodasHojas = null;
+      let pendingFileAuth = null;
       let pendingBatch = false;
       let pendingFilesList = [];
 
@@ -611,6 +629,12 @@
         document.getElementById('signModal').classList.add('open');
       }
 
+      function showSignModalAuth(file) {
+        pendingFileAuth = file;
+        document.getElementById('modalCertType').value = 'all';
+        document.getElementById('signModal').classList.add('open');
+      }
+
       function showSignModalBatch(files) {
         pendingBatch = true;
         pendingFilesList = files;
@@ -626,6 +650,7 @@
         pendingFileSoloImagen = null;
         pendingFileImgText = null;
         pendingFileTodasHojas = null;
+        pendingFileAuth = null;
         pendingBatch = false;
         pendingFilesList = [];
       }
@@ -656,6 +681,10 @@
           const file = pendingFileTodasHojas;
           hideSignModal();
           await doSignTodasHojas(file, '', certificateType);
+        } else if (pendingFileAuth) {
+          const file = pendingFileAuth;
+          hideSignModal();
+          await doSignAuth(file, '', certificateType);
         } else {
           const file = pendingFile;
           hideSignModal();
@@ -1076,6 +1105,94 @@
         console.log('Plain:', data.uri_plain);
 
         showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + ' (todas las hojas)...', 'info');
+
+        const start = Date.now();
+        let fallbackTriggered = false;
+        const timer = setTimeout(function () {
+          if (fallbackTriggered) return;
+          if (Date.now() - start < VISIBILITY_GRACE_MS && document.visibilityState === 'visible') {
+            fallbackTriggered = true;
+            window.location.href = FALLBACK_URL;
+          }
+        }, FALLBACK_DELAY_MS);
+
+        function cancelFallback() {
+          if (!fallbackTriggered) { clearTimeout(timer); fallbackTriggered = true; }
+        }
+        document.addEventListener('visibilitychange', function onVis() {
+          if (document.visibilityState === 'hidden') cancelFallback();
+        }, { once: true });
+        window.addEventListener('pagehide', cancelFallback, { once: true });
+        window.addEventListener('blur', cancelFallback, { once: true });
+
+        window.location.href = deepLink;
+
+        startPolling(selectedFile, 60, data.job);
+      }
+
+      // ===== FIRMAR AUTENTICACIÓN (doc_prueba9.pdf) =====
+      async function doSignAuth(selectedFile, userToken, certificateType) {
+        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
+
+        const GRAPHIC_URL = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTlcZ50Ci9uRJBet3r17ORbbDGEq-adGoaPS5Hm8L07qD_okGo9F6URTWE&s=10';
+        const SIG_TEXT = 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}';
+
+        const btn = document.querySelector('.btn-sign-auth[data-file="' + escapeAttr(selectedFile) + '"]');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
+        showStatus('Obteniendo URI de firma (autenticación) para ' + selectedFile + '...', 'info');
+
+        let data;
+        try {
+          const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              configuration: {
+                signature_type: 'basic',
+                signature_reason: 'Acepto el contenido del documento',
+                generate_request: 'NOMBRE EMPRESA',
+                certificate_type: certificateType,
+                purpose: 'authentication',
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+              },
+              token: userToken,
+              callback: CALLBACK_ENDPOINT,
+              documents: [{
+                document_code: crypto.randomUUID(),
+                file: selectedFile, user_id: 'USER123', doc_sha256: '',
+                settings: { vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
+                  vis_sig_page: 1, vis_sig_text_size: 10, vis_sig_text: SIG_TEXT, vis_sig_graphic: GRAPHIC_URL }
+              }]
+            }),
+            credentials: 'same-origin'
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || 'HTTP ' + resp.status);
+          }
+          data = await resp.json();
+        } catch (err) {
+          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
+          return;
+        }
+
+        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+
+        const encryptedBlob = data.uri_encrypted || data.data;
+        const deepLink = 'firmeasy://sign?data=' + encodeURIComponent(encryptedBlob);
+
+        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
+        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'authentication', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        deepLinkDisplay.style.display = 'block';
+
+        console.log('=== FIRMEASY DEEP LINK (AUTENTICACIÓN) ===');
+        console.log('Encrypted:', deepLink);
+        console.log('Plain:', data.uri_plain);
+
+        showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + ' (autenticación)...', 'info');
 
         const start = Date.now();
         let fallbackTriggered = false;

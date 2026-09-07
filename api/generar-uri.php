@@ -42,6 +42,7 @@
 
 // Configuración
 const STORAGE_DIR = __DIR__ . '/../storage/jobs';
+const SHA256_CACHE_FILE = __DIR__ . '/../storage/sha256_cache.json';
 const TOKEN_FIJO = 'tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT';
 const EXPIRACION_SEGUNDOS = 600; // 10 minutos
 
@@ -144,6 +145,19 @@ if (!in_array($certificateType, ['all', 'dni', 'certificado'], true)) {
 $job = generateUuidV4();
 $exp = time() + EXPIRACION_SEGUNDOS;
 
+// Caché SHA-256 persistente en disco
+$sha256Cache = [];
+if (file_exists(SHA256_CACHE_FILE)) {
+    $raw = file_get_contents(SHA256_CACHE_FILE);
+    if ($raw !== false) {
+        $parsed = json_decode($raw, true);
+        if (is_array($parsed)) {
+            $sha256Cache = $parsed;
+        }
+    }
+}
+$cacheModified = false;
+
 // Validar y procesar cada documento (soporta 1 o más documentos — firma en bloque)
 $documents = $data['documents'];
 $processedDocs = [];
@@ -179,11 +193,19 @@ foreach ($documents as $idx => $doc) {
 
         $docSha256 = $doc['doc_sha256'] ?? '';
         if (empty($docSha256)) {
-            $docSha256 = hash_file('sha256', $filePath);
-            if ($docSha256 === false) {
-                http_response_code(500);
-                echo json_encode(['error' => 'Error calculando SHA-256 del PDF']);
-                exit;
+            // Buscar en caché persistente
+            if (isset($sha256Cache[$fileName])) {
+                $docSha256 = $sha256Cache[$fileName];
+            } else {
+                $docSha256 = hash_file('sha256', $filePath);
+                if ($docSha256 === false) {
+                    http_response_code(500);
+                    echo json_encode(['error' => 'Error calculando SHA-256 del PDF']);
+                    exit;
+                }
+                // Guardar en caché
+                $sha256Cache[$fileName] = $docSha256;
+                $cacheModified = true;
             }
         } elseif (!preg_match('/^[a-f0-9]{64}$/i', $docSha256)) {
             http_response_code(400);
@@ -274,6 +296,15 @@ if (!file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHE
     http_response_code(500);
     echo json_encode(['error' => 'Error guardando job en almacenamiento']);
     exit;
+}
+
+// Guardar caché SHA-256 si hubo cambios
+if ($cacheModified) {
+    file_put_contents(
+        SHA256_CACHE_FILE,
+        json_encode($sha256Cache, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT),
+        LOCK_EX
+    );
 }
 
 // Construir URI plano (sin nonce, sin kid)

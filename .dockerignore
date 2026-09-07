@@ -1,0 +1,12 @@
+document/
+document/signed/
+storage/
+storage/jobs/
+storage/callbacks/
+storage/keys/
+test_*.php
+abrir_puerto_8081.bat
+cerrar_puerto_8081.bat
+.git
+.gitignore
+*.md

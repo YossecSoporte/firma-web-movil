@@ -14,15 +14,14 @@ if ($documentDir === false) {
 }
 
 $files = [];
-$iterator = new DirectoryIterator($documentDir);
-foreach ($iterator as $fileInfo) {
-    if ($fileInfo->isFile() && preg_match('/\.pdf$/i', $fileInfo->getFilename())) {
-        $files[] = [
-            'filename' => $fileInfo->getFilename(),
-            'size' => $fileInfo->getSize(),
-            'modified' => $fileInfo->getMTime(),
-        ];
-    }
+$pdfFiles = glob($documentDir . '/*.pdf');
+foreach ($pdfFiles as $filePath) {
+    $filename = basename($filePath);
+    $files[] = [
+        'filename' => $filename,
+        'size' => filesize($filePath),
+        'modified' => filemtime($filePath),
+    ];
 }
 
 // Ordenar por fecha de modificación (más reciente primero)
