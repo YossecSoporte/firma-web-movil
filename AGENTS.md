@@ -16,6 +16,7 @@
 - Sin base de datos — los jobs se guardan como archivos JSON en `storage/jobs/`.
 - Puerto host: **8081** (mapeado al puerto 80 del contenedor).
 - **Encriptación AES-256-GCM** de la URI completa (clave en `ENCRYPTION_KEY`).
+- **Encriptación X25519 ECDH + AES-256-GCM** para el flujo LATAM/Enterprise (`storage/firmeasy_keys.json` + `storage/keys/{kid}.json`).
 
 ---
 
@@ -25,6 +26,10 @@
 firma-web-movil/
 ├── index.php                  # Frontend principal (tabla responsive de documentos)
 ├── app-no-instalada.php       # Fallback si la app móvil no está instalada
+├── latam.php                  # Frontend LATAM X25519 (integración empresa)
+├── integracion.php            # Integración Enterprise X25519 + callbacks
+├── keys.php                   # Gestión de claves X25519 por kid
+├── callbacks.php              # Monitor de callbacks recibidos + export CSV
 ├── docker-compose.yml         # Orquestación Docker (puerto 8081:80)
 ├── Dockerfile                 # Imagen PHP-FPM + Nginx + Supervisor (Alpine)
 ├── docker/
@@ -32,7 +37,8 @@ firma-web-movil/
 │   ├── supervisord.conf       # Supervisor para PHP-FPM + Nginx
 │   └── php.ini                # Configuración PHP
 ├── api/                       # Endpoints PHP (backend)
-│   ├── generar-uri.php        # POST: crea job y devuelve URI firmeasy:// completa
+│   ├── generar-uri.php        # POST: crea job y devuelve URI firmeasy:// completa (AES)
+│   ├── generar-uri-x25519.php # POST: crea job y devuelve deep link X25519
 │   ├── job.php                # GET /api/job/{job}: devuelve config del job
 │   ├── token.php              # GET /api/token/{job}: legacy
 │   ├── generar-job.php        # Legacy (no lo usa el frontend)
@@ -41,13 +47,23 @@ firma-web-movil/
 │   ├── upload-signed.php      # POST: recibe PDF firmado en BINARIO y guarda en document/signed/
 │   ├── list-signed.php        # GET: lista PDFs firmados en document/signed/
 │   ├── download-signed.php    # GET: descarga PDF firmado
-│   └── clear-signed.php       # POST: elimina todos los PDFs firmados (limpieza)
+│   ├── clear-signed.php       # POST: elimina todos los PDFs firmados (limpieza)
+│   ├── callback.php           # POST: recibe callback tras firma (360/371/380)
+│   ├── list-callbacks.php     # GET: lista callbacks recibidos
+│   ├── resend-callback.php    # POST: reenvía callback vía WhatsApp/Email/Logging
+│   ├── export-csv.php         # GET: exporta CSV callbacks
+│   ├── register-key.php       # POST: registra clave pública X25519 cliente (kid)
+│   ├── list-keys.php          # GET: lista claves X25519 registradas
+│   ├── delete-key.php         # DELETE: elimina clave por kid
+│   └── batch-token.php        # POST/GET token batch individual/lote
 ├── document/                 # PDFs originales a firmar
 │   ├── doc_prueba1.pdf        # PDF real (25791 bytes)
 │   ├── doc_prueba2.pdf        # PDF real (25791 bytes)
 │   └── test.pdf               # PDF fake de prueba (25 bytes, "%PDF-1.4 fake pdf content")
 ├── document/signed/           # PDFs firmados subidos por la app móvil (se crea sola)
 ├── storage/jobs/              # Jobs en JSON (uno por archivo {uuid}.json)
+├── storage/keys/              # Claves X25519 por kid (firmeasy_keys.json + keys/{kid}.json)
+├── storage/firmeasy_keys.json # Clave pública FirmEasy X25519
 ├── test_payload.json          # Payload de prueba para POST /api/generar-uri.php
 ├── ejemplo.json               # Ejemplo de payload
 ├── abrir_puerto_8081.bat      # Abre puerto 8081 en firewall de Windows (profile=any)
@@ -90,6 +106,23 @@ docker-compose logs -f
 **Volumen bind:** `./:/var/www/html` — los cambios en archivos PHP se reflejan **al instante** sin reiniciar (excepto cambios en `docker/nginx.conf` que requieren `docker-compose restart`).
 
 ---
+
+## 4.1 Rutas front-end y qué hacen
+
+| Ruta | Archivo | Encriptación | Qué hace |
+|---|---|---|---|
+| `http://localhost:8081/` | `index.php` | **AES-256-GCM** (`ENCRYPTION_KEY`) | Frontend principal: tabla responsive de documentos, modal pide Token + Tipo certificado → `POST /api/generar-uri.php` → deep link `firmeasy://sign?data=<blob>`. Descarga PDFs y gestiona firmados. |
+| `http://localhost:8081/latam` | `latam.php` | **AES-256-GCM** (`ENCRYPTION_KEY`) | Flujo LATAM / integración empresa con AES. Igual UI que index pero con configuración LATAM, casos de prueba especiales y exportación CSV. Usa `/api/generar-uri.php`. |
+| `http://localhost:8081/integracion` | `integracion.php` | **X25519 ECDH + HKDF + AES-256-GCM** | Integración Enterprise. Frontend para pruebas de deep link con X25519. `POST /api/generar-uri-x25519.php` con `kid` fijo (`android-app`). Genera `firmeasy://sign?data=<blob X25519>`. Callback URL configurable en `CALLBACK_URL`. |
+| `http://localhost:8081/callbacks` | `callbacks.php` | — (solo monitoreo) | Dashboard de callbacks recibidos: lista, filtros por estado/kid, reenvío vía WhatsApp/Email/Logging, export CSV. Lee `api/list-callbacks.php`, `api/resend-callback.php`, `api/export-csv.php`. |
+
+**Detalles de encriptación**
+- **AES-256-GCM (index / latam):** Clave simétrica `ENCRYPTION_KEY` (base64 32 bytes) compartida backend ↔ app móvil. Blob `base64url(IV12||CT||TAG16)`. Contenido descifrado contiene `job`, `exp`, `token`.
+- **X25519 ECDH (integracion):** Empresa registra clave pública + `kid` vía `POST /api/register-key.php`. FirmEasy guarda `storage/keys/{kid}.json`. Para generar deep link, backend obtiene clave pública FirmEasy de `storage/firmeasy_keys.json` (`FF=uc39D7873TaG9nps15ehTOHE+i7hhDt40zoV7Ov3k34=`), hace `sodium_crypto_kx_client_session_keys` con par empresa, deriva clave AES vía HKDF, cifra payload con AES-256-GCM. Blob transportado en deep link `firmeasy://sign?data=<blob>`.
+
+---
+
+
 
 ## 5. Endpoints de la API
 
