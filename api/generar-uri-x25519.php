@@ -1,0 +1,470 @@
+<?php
+
+/**
+ * Endpoint: api/generar-uri-x25519.php
+ * Método: POST
+ * Genera un job para firma y devuelve el deep link cifrado con X25519 + AES-256-GCM.
+ *
+ * Encriptación: X25519 ECDH (crypto_kx) + HKDF-SHA256 + AES-256-GCM
+ *   - Servidor (nosotros): par estático en storage/firmeasy_keys.json
+ *   - Cliente (la empresa): par registrado vía POST /api/register-key.php en storage/keys/{kid}.json
+ *   - rx = sodium_crypto_kx_server_session_keys(serverKeypair, empresaPub)[0]
+ *   - AES key = HKDF-SHA256(rx, salt='firmeasy-deeplink-v1', info='aes-encryption-key', 32)
+ *
+ * Entrada (JSON body):
+ * {
+ *   "kid": "default",
+ *   "configuration": { "signature_type": "basic", ... },
+ *   "token": "TOKEN_USUARIO",
+ *   "documents": [ { "file": "doc_prueba1.pdf", "user_id": "USER123", ... } ]
+ * }
+ *
+ * Respuesta:
+ * {
+ *   "data": "BASE64URL_BLOB",
+ *   "sid": "TOKEN_USUARIO",
+ *   "kid": "default",
+ *   "job": "uuid",
+ *   "exp": 1786140125,
+ *   "deep_link": "firmeasy://integration?data=BASE64URL_BLOB&sid=TOKEN",
+ *   "uri_plain": "{ \"url\": \"...\", \"exp\": ... }",
+ *   "documents": [...]
+ * }
+ */
+
+// Configuración
+const STORAGE_DIR = __DIR__ . '/../storage/jobs';
+const SHA256_CACHE_FILE = __DIR__ . '/../storage/sha256_cache.json';
+const TOKEN_FIJO = 'tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT';
+const EXPIRACION_SEGUNDOS = 600; // 10 minutos
+const KEYS_DIR = __DIR__ . '/../storage/keys';
+const DEFAULT_KID = 'default';
+
+// Base URL del sistema externo
+$BASE_URL_EXTERNO = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://localhost:8081', '/');
+
+// Cargar par de claves estático de FirmEasy (server)
+$FIRMEASY_KEYS_FILE = __DIR__ . '/../storage/firmeasy_keys.json';
+if (!file_exists($FIRMEASY_KEYS_FILE)) {
+    http_response_code(500);
+    echo json_encode(['error' => 'No existe storage/firmeasy_keys.json. Ejecuta gen_keys una vez.']);
+    exit;
+}
+$firmeasyKeys = json_decode(file_get_contents($FIRMEASY_KEYS_FILE), true);
+if (empty($firmeasyKeys['secret_key']) || empty($firmeasyKeys['public_key'])) {
+    http_response_code(500);
+    echo json_encode(['error' => 'firmeasy_keys.json corrupto (falta secret_key o public_key).']);
+    exit;
+}
+$firmeasySecretKey = sodium_base642bin($firmeasyKeys['secret_key'], SODIUM_BASE64_VARIANT_ORIGINAL);
+$firmeasyPublicKey = sodium_base642bin($firmeasyKeys['public_key'], SODIUM_BASE64_VARIANT_ORIGINAL);
+$firmeasyKeypair = $firmeasySecretKey . $firmeasyPublicKey;
+
+// CORS
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
+// Solo POST
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['error' => 'Método no permitido. Use POST.']);
+    exit;
+}
+
+// Leer JSON
+$input = file_get_contents('php://input');
+$data = json_decode($input, true);
+
+if (json_last_error() !== JSON_ERROR_NONE) {
+    http_response_code(400);
+    echo json_encode(['error' => 'JSON inválido: ' . json_last_error_msg()]);
+    exit;
+}
+
+// Validar estructura básica
+if (!isset($data['configuration']) || !isset($data['documents']) || !is_array($data['documents']) || count($data['documents']) === 0) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Estructura inválida: se requiere "configuration" y "documents[]" con al menos 1 elemento.']);
+    exit;
+}
+
+// Obtener kid (key ID de la empresa/cliente)
+$kid = $data['kid'] ?? DEFAULT_KID;
+$kid = preg_replace('/[^a-zA-Z0-9_-]/', '', $kid);
+
+// Cargar pública de la empresa/cliente
+$empresaKeyFile = KEYS_DIR . '/' . $kid . '.json';
+if (!file_exists($empresaKeyFile)) {
+    http_response_code(400);
+    echo json_encode(['error' => "No se encontró clave registrada para kid: $kid. Registra la pública con POST /api/register-key.php"]);
+    exit;
+}
+$empresaKeyData = json_decode(file_get_contents($empresaKeyFile), true);
+$empresaPublicKey = sodium_base642bin($empresaKeyData['public_key'], SODIUM_BASE64_VARIANT_ORIGINAL);
+
+// Obtener token: usar el del body o auto-obtener de la API FirmEasy
+$userToken = $data['token'] ?? '';
+if (empty($userToken)) {
+    $userToken = fetchBatchToken();
+}
+
+function fetchBatchToken(): string {
+    $apiKey = getenv('FIRMEASY_API_KEY');
+    if (empty($apiKey)) {
+        throw new Exception('FIRMEASY_API_KEY no configurada en entorno');
+    }
+    $ch = curl_init('https://enterprise.digital.firmeasy.legal/api/v1/auth/token');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode(['type' => 'batch']),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            'X-API-KEY: ' . $apiKey,
+        ],
+        CURLOPT_TIMEOUT        => 15,
+    ]);
+    $resp = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
+
+    if ($resp === false || $code !== 200) {
+        throw new Exception("Error obteniendo token batch (HTTP $code): $err");
+    }
+    $json = json_decode($resp, true);
+    if (empty($json['token'])) {
+        throw new Exception('Respuesta sin token: ' . $resp);
+    }
+    return $json['token'];
+}
+
+// Validar certificate_type
+$certificateType = $data['configuration']['certificate_type'] ?? 'all';
+if (!in_array($certificateType, ['all', 'dni', 'certificado'], true)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'certificate_type debe ser: all, dni o certificado']);
+    exit;
+}
+
+// Validar batch_error_handling (opcional)
+$batchErrorHandling = null;
+if (isset($data['configuration']['batch_error_handling']) && is_array($data['configuration']['batch_error_handling'])) {
+    $beh = $data['configuration']['batch_error_handling'];
+
+    $validDownloadModes = ['abort', 'continue'];
+    $validUploadModes   = ['block', 'continue'];
+
+    // Validar download
+    if (isset($beh['download']) && is_array($beh['download'])) {
+        $dl = $beh['download'];
+        $dlMode = $dl['mode'] ?? 'abort';
+        $dlRetry = isset($dl['retry']) ? (int)$dl['retry'] : 0;
+        if (!in_array($dlMode, $validDownloadModes, true)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'batch_error_handling.download.mode debe ser: abort | continue']);
+            exit;
+        }
+        if ($dlRetry < 0 || $dlRetry > 10) {
+            http_response_code(400);
+            echo json_encode(['error' => 'batch_error_handling.download.retry debe ser 0-10']);
+            exit;
+        }
+    }
+
+    // Validar upload
+    if (isset($beh['upload']) && is_array($beh['upload'])) {
+        $ul = $beh['upload'];
+        $ulMode = $ul['mode'] ?? 'block';
+        $ulRetry = isset($ul['retry']) ? (int)$ul['retry'] : 0;
+        if (!in_array($ulMode, $validUploadModes, true)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'batch_error_handling.upload.mode debe ser: block | continue']);
+            exit;
+        }
+        if ($ulRetry < 0 || $ulRetry > 10) {
+            http_response_code(400);
+            echo json_encode(['error' => 'batch_error_handling.upload.retry debe ser 0-10']);
+            exit;
+        }
+    }
+
+    // Normalizar: establecer defaults para campos faltantes
+    $batchErrorHandling = [
+        'download' => [
+            'mode'  => $beh['download']['mode'] ?? 'abort',
+            'retry' => isset($beh['download']['retry']) ? (int)$beh['download']['retry'] : 0,
+        ],
+        'upload' => [
+            'mode'  => $beh['upload']['mode'] ?? 'block',
+            'retry' => isset($beh['upload']['retry']) ? (int)$beh['upload']['retry'] : 0,
+        ],
+    ];
+
+    // Guardar en configuration
+    $data['configuration']['batch_error_handling'] = $batchErrorHandling;
+}
+
+// Generar job, exp
+$job = generateUuidV4();
+$exp = time() + EXPIRACION_SEGUNDOS;
+
+// Caché SHA-256 persistente en disco
+$sha256Cache = [];
+if (file_exists(SHA256_CACHE_FILE)) {
+    $raw = file_get_contents(SHA256_CACHE_FILE);
+    if ($raw !== false) {
+        $parsed = json_decode($raw, true);
+        if (is_array($parsed)) {
+            $sha256Cache = $parsed;
+        }
+    }
+}
+$cacheModified = false;
+
+// Validar y procesar cada documento (soporta 1 o más documentos — firma en bloque)
+$documents = $data['documents'];
+$processedDocs = [];
+
+foreach ($documents as $idx => $doc) {
+    $hasDataUrl = isset($doc['data']) && !empty($doc['data']);
+
+    if ($hasDataUrl) {
+        $required = ['user_id', 'document_code'];
+    } else {
+        $required = ['file', 'user_id', 'document_code'];
+    }
+
+    foreach ($required as $field) {
+        if (!isset($doc[$field])) {
+            http_response_code(400);
+            echo json_encode(['error' => "Campo requerido faltante en documento $idx: $field"]);
+            exit;
+        }
+    }
+
+    $fileName = isset($doc['file']) ? basename($doc['file']) : '';
+    $userId = $doc['user_id'];
+    $dataUrl = $hasDataUrl ? $doc['data'] : '';
+
+    if (!$hasDataUrl) {
+        $filePath = __DIR__ . '/../document/' . $fileName;
+        if (!file_exists($filePath)) {
+            http_response_code(404);
+            echo json_encode(['error' => "Archivo no encontrado en document/: $fileName"]);
+            exit;
+        }
+
+        $docSha256 = $doc['doc_sha256'] ?? '';
+        if (empty($docSha256)) {
+            // Buscar en caché persistente
+            if (isset($sha256Cache[$fileName])) {
+                $docSha256 = $sha256Cache[$fileName];
+            } else {
+                $docSha256 = hash_file('sha256', $filePath);
+                if ($docSha256 === false) {
+                    http_response_code(500);
+                    echo json_encode(['error' => 'Error calculando SHA-256 del PDF']);
+                    exit;
+                }
+                // Guardar en caché
+                $sha256Cache[$fileName] = $docSha256;
+                $cacheModified = true;
+            }
+        } elseif (!preg_match('/^[a-f0-9]{64}$/i', $docSha256)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'doc_sha256 debe ser 64 caracteres hexadecimales']);
+            exit;
+        }
+    } else {
+        // Rama con data URL (GitHub u otra fuente remota)
+        $docSha256 = $doc['doc_sha256'] ?? '';
+        if (empty($docSha256)) {
+            // Detectar URLs de prueba (httpbin.org/status/*) y usar SHA256 dummy
+            if (str_contains($dataUrl, 'httpbin.org/status/') || str_contains($dataUrl, 'download-fail.php') || str_contains($dataUrl, 'upload-signed-fail.php')) {
+                // SHA256 dummy para URLs de prueba que fallan intencionalmente
+                $docSha256 = str_repeat('0', 64);
+            } else {
+                // Descargar el PDF desde la URL remota y calcular SHA-256
+                $remoteContent = @file_get_contents($dataUrl);
+                if ($remoteContent === false) {
+                    // file_get_contents falló: intentar con cURL
+                    $ch = curl_init($dataUrl);
+                    curl_setopt_array($ch, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_FOLLOWLOCATION => true,
+                        CURLOPT_SSL_VERIFYPEER => false,
+                        CURLOPT_TIMEOUT        => 30,
+                        CURLOPT_USERAGENT      => 'FirmEasy-Web/1.0',
+                    ]);
+                    $remoteContent = curl_exec($ch);
+                    $httpCode      = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $curlError     = curl_error($ch);
+                    curl_close($ch);
+                    if ($remoteContent === false || $httpCode !== 200) {
+                        http_response_code(502);
+                        echo json_encode(['error' => 'No se pudo descargar el PDF desde ' . $dataUrl . ' para calcular SHA-256. cURL: ' . $curlError]);
+                        exit;
+                    }
+                }
+                $docSha256 = hash('sha256', $remoteContent);
+                if ($docSha256 === false) {
+                    http_response_code(500);
+                    echo json_encode(['error' => 'Error calculando SHA-256 del PDF remoto']);
+                    exit;
+                }
+            }
+        } elseif (!preg_match('/^[a-f0-9]{64}$/i', $docSha256)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'doc_sha256 debe ser 64 caracteres hexadecimales']);
+            exit;
+        }
+    }
+
+    if (!empty($dataUrl)) {
+        $fromUrl = $dataUrl;
+    } else {
+        $fromUrl = $BASE_URL_EXTERNO . '/api/download.php?file=' . rawurlencode($fileName);
+    }
+    $toUrl = !empty($doc['to_url'])
+        ? $doc['to_url']
+        : $BASE_URL_EXTERNO . '/api/upload-signed.php?file=' . rawurlencode($fileName) . '&user_id=' . rawurlencode($userId) . '&job=' . $job . '&document_code=' . rawurlencode($doc['document_code']);
+
+    $processed = [
+        'document_code' => $doc['document_code'],
+        'from' => $fromUrl,
+        'to' => $toUrl,
+        'name_pdf' => $fileName,
+        'doc_sha256' => $docSha256,
+        'status' => 'pending'
+    ];
+    // settings es opcional: solo se incluye si el cliente lo envía
+    if (isset($doc['settings']) && is_array($doc['settings'])) {
+        $processed['settings'] = $doc['settings'];
+    }
+    $processedDocs[] = $processed;
+}
+
+// Preparar datos para guardar
+$jobData = [
+    'job' => $job,
+    'exp' => $exp,
+    'token' => $userToken,
+    'kid' => $kid,
+    'configuration' => $data['configuration'],
+    'documents' => $processedDocs,
+    'callback' => $data['callback'] ?? '',
+    'created_at' => time()
+];
+
+// Guardar en archivo JSON
+$storageFile = STORAGE_DIR . '/' . $job . '.json';
+if (!file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Error guardando job en almacenamiento']);
+    exit;
+}
+
+// Guardar caché SHA-256 si hubo cambios
+if ($cacheModified) {
+    file_put_contents(
+        SHA256_CACHE_FILE,
+        json_encode($sha256Cache, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT),
+        LOCK_EX
+    );
+}
+
+// --- ECDH: secreto compartido (server rx) ---
+$kxKeys = sodium_crypto_kx_server_session_keys($firmeasyKeypair, $empresaPublicKey);
+$rx = $kxKeys[0];
+
+// --- HKDF-SHA256: derivar clave AES de 32 bytes ---
+$aesKey = hkdf_sha256($rx, 'firmeasy-deeplink-v1', 'aes-encryption-key', 32);
+
+// Construir payload plano: url del job + exp (todo dentro del blob cifrado)
+$deepDataUrl = $BASE_URL_EXTERNO . '/api/job/' . $job;
+$plainPayload = json_encode([
+    'url' => $deepDataUrl,
+    'exp' => $exp,
+], JSON_UNESCAPED_SLASHES);
+
+// Cifrar payload con AES-256-GCM
+$encryptedBlob = encryptAesGcm($plainPayload, $aesKey);
+
+// Limpiar claves de memoria
+sodium_memzero($rx);
+sodium_memzero($aesKey);
+sodium_memzero($firmeasySecretKey);
+sodium_memzero($firmeasyPublicKey);
+sodium_memzero($empresaPublicKey);
+
+// Deep link final: firmeasy://integration?data=<BLOB>&sid=<TOKEN>
+$deepLink = 'firmeasy://integration?data=' . rawurlencode($encryptedBlob) . '&sid=' . rawurlencode($userToken);
+
+// Respuesta
+header('Content-Type: application/json; charset=utf-8');
+echo json_encode([
+    'data' => $encryptedBlob,
+    'sid' => $userToken,
+    'kid' => $kid,
+    'job' => $job,
+    'exp' => $exp,
+    'deep_link' => $deepLink,
+    'uri_plain' => $plainPayload,
+    'documents' => $processedDocs
+], JSON_UNESCAPED_SLASHES);
+
+/**
+ * HKDF-SHA256: deriva una clave a partir de un secreto crudo (RFC 5869).
+ *
+ * @param string $ikm    Input Keying Material (secreto ECDH crudo)
+ * @param string $salt   Salt (contexto de la aplicación)
+ * @param string $info   Info string (propósito de la clave)
+ * @param int    $length Longitud deseada de la clave derivada
+ * @return string        Clave derivada
+ */
+function hkdf_sha256(string $ikm, string $salt, string $info, int $length = 32): string
+{
+    $prk = hash_hmac('sha256', $ikm, $salt, true);
+    $okm = '';
+    $t = '';
+    for ($i = 1; strlen($okm) < $length; $i++) {
+        $t = hash_hmac('sha256', $t . $info . chr($i), $prk, true);
+        $okm .= $t;
+    }
+    return substr($okm, 0, $length);
+}
+
+/**
+ * Cifra un plaintext con AES-256-GCM.
+ * Formato salida: base64url( IV(12) || CIPHERTEXT || TAG(16) )
+ */
+function encryptAesGcm(string $plaintext, string $key): string
+{
+    $iv = random_bytes(12);
+    $tag = '';
+    $ciphertext = openssl_encrypt($plaintext, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag, '', 16);
+    if ($ciphertext === false) {
+        throw new Exception('Error cifrando con AES-256-GCM');
+    }
+    $blob = $iv . $ciphertext . $tag;
+    return rtrim(strtr(base64_encode($blob), '+/', '-_'), '=');
+}
+
+/**
+ * Genera UUID v4 RFC 4122
+ */
+function generateUuidV4(): string
+{
+    $data = random_bytes(16);
+    $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+    $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+    return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+}
+
+exit;
