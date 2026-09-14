@@ -141,6 +141,64 @@ if (!in_array($certificateType, ['all', 'dni', 'certificado'], true)) {
     exit;
 }
 
+// Validar batch_error_handling (opcional)
+$batchErrorHandling = null;
+if (isset($data['configuration']['batch_error_handling']) && is_array($data['configuration']['batch_error_handling'])) {
+    $beh = $data['configuration']['batch_error_handling'];
+
+    $validDownloadModes = ['abort', 'continue'];
+    $validUploadModes   = ['block', 'continue'];
+
+    // Validar download
+    if (isset($beh['download']) && is_array($beh['download'])) {
+        $dl = $beh['download'];
+        $dlMode = $dl['mode'] ?? 'abort';
+        $dlRetry = isset($dl['retry']) ? (int)$dl['retry'] : 0;
+        if (!in_array($dlMode, $validDownloadModes, true)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'batch_error_handling.download.mode debe ser: abort | continue']);
+            exit;
+        }
+        if ($dlRetry < 0 || $dlRetry > 10) {
+            http_response_code(400);
+            echo json_encode(['error' => 'batch_error_handling.download.retry debe ser 0-10']);
+            exit;
+        }
+    }
+
+    // Validar upload
+    if (isset($beh['upload']) && is_array($beh['upload'])) {
+        $ul = $beh['upload'];
+        $ulMode = $ul['mode'] ?? 'block';
+        $ulRetry = isset($ul['retry']) ? (int)$ul['retry'] : 0;
+        if (!in_array($ulMode, $validUploadModes, true)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'batch_error_handling.upload.mode debe ser: block | continue']);
+            exit;
+        }
+        if ($ulRetry < 0 || $ulRetry > 10) {
+            http_response_code(400);
+            echo json_encode(['error' => 'batch_error_handling.upload.retry debe ser 0-10']);
+            exit;
+        }
+    }
+
+    // Normalizar: establecer defaults para campos faltantes
+    $batchErrorHandling = [
+        'download' => [
+            'mode'  => $beh['download']['mode'] ?? 'abort',
+            'retry' => isset($beh['download']['retry']) ? (int)$beh['download']['retry'] : 0,
+        ],
+        'upload' => [
+            'mode'  => $beh['upload']['mode'] ?? 'block',
+            'retry' => isset($beh['upload']['retry']) ? (int)$beh['upload']['retry'] : 0,
+        ],
+    ];
+
+    // Guardar en configuration
+    $data['configuration']['batch_error_handling'] = $batchErrorHandling;
+}
+
 // Generar job, exp
 $job = generateUuidV4();
 $exp = time() + EXPIRACION_SEGUNDOS;
@@ -217,8 +275,8 @@ foreach ($documents as $idx => $doc) {
         $docSha256 = $doc['doc_sha256'] ?? '';
         if (empty($docSha256)) {
             // Detectar URLs de prueba (httpbin.org/status/*) y usar SHA256 dummy
-            if (str_contains($dataUrl, 'httpbin.org/status/')) {
-                // SHA256 dummy para casos de prueba: 64 ceros
+            if (str_contains($dataUrl, 'httpbin.org/status/') || str_contains($dataUrl, 'download-fail.php') || str_contains($dataUrl, 'upload-signed-fail.php')) {
+                // SHA256 dummy para URLs de prueba que fallan intencionalmente
                 $docSha256 = str_repeat('0', 64);
             } else {
                 // Descargar el PDF desde la URL remota y calcular SHA-256
@@ -262,7 +320,9 @@ foreach ($documents as $idx => $doc) {
     } else {
         $fromUrl = $BASE_URL_EXTERNO . '/api/download.php?file=' . rawurlencode($fileName);
     }
-    $toUrl = $BASE_URL_EXTERNO . '/api/upload-signed.php?file=' . rawurlencode($fileName) . '&user_id=' . rawurlencode($userId) . '&job=' . $job . '&document_code=' . rawurlencode($doc['document_code']);
+    $toUrl = !empty($doc['to_url'])
+        ? $doc['to_url']
+        : $BASE_URL_EXTERNO . '/api/upload-signed.php?file=' . rawurlencode($fileName) . '&user_id=' . rawurlencode($userId) . '&job=' . $job . '&document_code=' . rawurlencode($doc['document_code']);
 
     $processed = [
         'document_code' => $doc['document_code'],

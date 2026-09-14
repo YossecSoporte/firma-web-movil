@@ -8,4 +8,4 @@ if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
 }
 
 $body = file_get_contents('php://input');
-proxyPost('/session/start', $body, $bearerToken);
+proxyPostInjectKey('/session/start', $body, $bearerToken);

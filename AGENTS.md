@@ -122,7 +122,11 @@ docker-compose logs -f
     "signature_type": "basic",
     "signature_reason": "Acepto el contenido del documento",
     "generate_request": "NOMBRE EMPRESA",
-    "certificate_type": "all"
+    "certificate_type": "all",
+    "batch_error_handling": {
+      "download": { "mode": "continue", "retry": 2 },
+      "upload":   { "mode": "continue", "retry": 2 }
+    }
   },
   "token": "TOKEN_USUARIO",
   "documents": [
@@ -148,6 +152,36 @@ docker-compose logs -f
 - Claves de `settings` (3er nivel): **`vis_sig_*` en inglés** — NO cambiar (los consume la app móvil FirmEasy; cambiarlos rompería la integración).
 - Los **valores** (textos, placeholders `<SIGNER>`/`<DATE>`/`<OU>`) pueden estar en español.
 - Los `storage/jobs/*.json` viejos usaban claves en español (`configuracion`, `documentos`, `tipo_firma`) — son históricos, no se modifican.
+
+### `batch_error_handling` (configuración de errores en lote)
+
+Opcional dentro de `configuration`. Controla el comportamiento de la app móvil cuando una operación de download/upload falla en un lote de documentos.
+
+```json
+"batch_error_handling": {
+  "download": {
+    "mode": "continue",   // "abort" | "continue"
+    "retry": 2            // 0-10, reintentos por documento
+  },
+  "upload": {
+    "mode": "continue",   // "block" | "continue"
+    "retry": 2            // 0-10, reintentos por documento
+  }
+}
+```
+
+| Operación | Modo | Descripción |
+|---|---|---|
+| `download` | `abort` | Si falla 1 descarga, **aborta todo el lote** (comportamiento actual por defecto) |
+| `download` | `continue` | Si falla 1, **sigue con los demás** y reporta el fallido |
+| `upload` | `block` | Si falla 1 subida, **se bloquea** (evita rate-limit del servidor) |
+| `upload` | `continue` | Si falla 1, **sube el resto** y reporta el fallido |
+
+**Defaults** (si se omite `batch_error_handling`):
+- `download.mode`: `abort`
+- `download.retry`: `0`
+- `upload.mode`: `block`
+- `upload.retry`: `0`
 
 ### Jobs antiguos vs nuevos
 - **Jobs viejos** (con `configuracion`/`documentos`/`tipo_firma`) están en `storage/jobs/` con claves en español.

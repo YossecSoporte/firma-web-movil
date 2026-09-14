@@ -5,7 +5,7 @@
     "generate_request": "NOMBRE EMPRESA",
     "certificate_type": "all",
     "purpose": "signing",
-    "accepted_issuers": ["CN=AC RAIZ001, O=RENIEC, C=PE"]
+    "accepted_issuers": ["CN=AC RAIZ001, O=RENIEC, C=PE", "CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE"]
   },
   "token": "tkn_bat_4kyVd04obKkRqL3GSglYz2TAur4JUH1c",
   "documents": [

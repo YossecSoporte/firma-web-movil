@@ -91,6 +91,8 @@
     .batch-mode-picker:focus { border-color: #0066cc; }
     .btn-sign-batch { background: #fd7e14; color: #fff; }
     .btn-sign-batch:hover:not(:disabled) { background: #e06a0d; }
+    .btn-sign-firma10 { background: #6f42c1; color: #fff; }
+    .btn-sign-firma10:hover:not(:disabled) { background: #5a32a3; }
     .btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
 
     /* ===== Cards (móvil) ===== */
@@ -172,8 +174,12 @@
 
     <div class="toolbar">
       <span id="docCount" class="count">Cargando...</span>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <div style="display:flex;gap:0;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button id="btnFirma10" class="refresh-btn btn-sign-firma10" type="button" style="background:#6f42c1;color:#fff;border-color:#6f42c1;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            Firma en 10
+          </button>
+          <div style="display:flex;gap:0;">
           <button id="btnBatchSign" class="refresh-btn" type="button" disabled style="border-radius:6px 0 0 6px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             <span id="batchLabel">Firma en bloque</span>
@@ -718,7 +724,7 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
               },
               token: userToken,
               callback: CALLBACK_ENDPOINT,
@@ -754,7 +760,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK ===');
@@ -808,7 +814,7 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
               },
               token: userToken,
               callback: CALLBACK_ENDPOINT,
@@ -838,7 +844,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (SIN SETTINGS) ===');
@@ -894,7 +900,7 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
               },
               token: userToken,
               callback: CALLBACK_ENDPOINT,
@@ -924,7 +930,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (SOLO IMAGEN) ===');
@@ -981,7 +987,7 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
               },
               token: userToken,
               callback: CALLBACK_ENDPOINT,
@@ -1011,7 +1017,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (IMAGEN+TEXTO) ===');
@@ -1068,7 +1074,7 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
               },
               token: userToken,
               callback: CALLBACK_ENDPOINT,
@@ -1098,7 +1104,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (TODAS LAS HOJAS) ===');
@@ -1155,7 +1161,7 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'authentication',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
               },
               token: userToken,
               callback: CALLBACK_ENDPOINT,
@@ -1186,7 +1192,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'authentication', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'authentication', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (AUTENTICACIÓN) ===');
@@ -1242,7 +1248,7 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
               },
               token: userToken,
               callback: CALLBACK_ENDPOINT,
@@ -1279,7 +1285,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (GITHUB) ===');
@@ -1551,7 +1557,7 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
               },
               token: userToken,
               callback: CALLBACK_ENDPOINT,
@@ -1581,7 +1587,7 @@
 
         var deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (BLOQUE) ===');
@@ -1634,7 +1640,7 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
               },
               token: userToken,
               callback: CALLBACK_ENDPOINT,
@@ -1669,7 +1675,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (IMAGEN ROTA) ===');
@@ -1699,7 +1705,7 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
               },
               token: userToken,
               callback: CALLBACK_ENDPOINT,
@@ -1735,7 +1741,7 @@
 
         const deepLinkDisplay = document.getElementById('deepLinkDisplay');
         document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
+        document.getElementById('deepLinkJson').textContent = JSON.stringify({ job: data.job, token: userToken, configuration: { signature_type: 'basic', signature_reason: 'Acepto el contenido del documento', generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType, purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'] }, documents: data.documents, callback: CALLBACK_ENDPOINT }, null, 2);
         deepLinkDisplay.style.display = 'block';
 
         console.log('=== FIRMEASY DEEP LINK (PDF ROTO) ===');
@@ -1747,9 +1753,71 @@
         startPolling('doc_prueba1.pdf', 60, data.job);
       }
 
+      // ===== FIRMA EN 10 (10 archivos específicos con coordenadas fijas) =====
+      async function doSignFirma10() {
+        var FIRMA10_FILES = [
+          'doc_pruebaFirmado.pdf',
+          'manifiesto-1.pdf',
+          'manifiesto-2.pdf',
+          'manifiesto-3.pdf',
+          'manifiesto-4.pdf',
+          'manifiesto-5.pdf',
+          'manifiesto-6.pdf',
+          'manifiesto-7.pdf',
+          'manifiesto-8.pdf',
+          'manifiesto-9.pdf'
+        ];
+
+        var btn10 = document.getElementById('btnFirma10');
+        var origHtml = btn10.innerHTML;
+        btn10.disabled = true;
+        btn10.innerHTML = ICO_WAIT + ' Preparando...';
+        showStatus('Generando CSV para Firma en 10...', 'info');
+
+        try {
+          var tokenResp = await fetch('/api/batch-token.php', { credentials: 'same-origin' });
+          if (!tokenResp.ok) throw new Error('HTTP ' + tokenResp.status);
+          var tokenData = await tokenResp.json();
+          var tokenIntegration = tokenData.token_integration;
+
+          var csvParams = 'files=' + encodeURIComponent(FIRMA10_FILES.join(','));
+          csvParams += '&x=300&y=15&width=150&height=50';
+          csvParams += '&text=<SIGNER>\\nFecha: <DATE>\\nOU: <OU>\\nCARGO: <TITLE>\\nFirmado por Firmeasy.legal';
+          var csvUrl = window.location.origin + '/api/export-csv.php?' + csvParams;
+          var deepLink = 'firmeasyenterprise://?batch_csv=' + encodeURIComponent(csvUrl) + '&token_integration=' + encodeURIComponent(tokenIntegration);
+
+          console.log('=== FIRMEASY DEEP LINK (FIRMA EN 10) ===');
+          console.log('Deep Link:', deepLink);
+          console.log('CSV URL:', csvUrl);
+          console.log('Files:', FIRMA10_FILES.join(', '));
+
+          var deepLinkDisplay = document.getElementById('deepLinkDisplay');
+          deepLinkDisplay.querySelector('#deepLinkUri').textContent = deepLink;
+          deepLinkDisplay.querySelector('#deepLinkJson').textContent = JSON.stringify({
+            batch_csv: csvUrl,
+            token_integration: tokenIntegration,
+            exp: tokenData.exp,
+            files: FIRMA10_FILES,
+            coordinates: { x: 300, y: 15, width: 150, height: 50 },
+            text: '<SIGNER>\nFecha: <DATE>\nOU: <OU>\nCARGO: <TITLE>\nFirmado por Firmeasy.legal'
+          }, null, 2);
+          deepLinkDisplay.style.display = 'block';
+
+          showStatus('Abriendo app FirmEasy para Firma en 10...', 'info');
+          window.location.href = deepLink;
+
+        } catch (err) {
+          showStatus('Error: ' + err.message, 'error');
+        }
+
+        btn10.disabled = false;
+        btn10.innerHTML = origHtml;
+      }
+
       // ===== INIT =====
       btnRefresh.addEventListener('click', refreshAll);
       btnBatch.addEventListener('click', openAppBatch);
+      document.getElementById('btnFirma10').addEventListener('click', doSignFirma10);
 
       // Listeners casos especiales
       document.querySelectorAll('[data-test="bad-image"]').forEach(function(btn) {

@@ -52,8 +52,12 @@ $fromUrlOverride = $_GET['from_url'] ?? '';
 // Parámetro file: generar CSV para 1 solo archivo
 $singleFile = $_GET['file'] ?? '';
 
+// Parámetro files: lista de archivos separados por coma (para batch con lista fija)
+$filesParam = $_GET['files'] ?? '';
+$filesList = !empty($filesParam) ? array_map('trim', explode(',', $filesParam)) : [];
+
 // Archivos excluidos de la generación
-$excluded = ['test.pdf', 'doc_pruebaFirmado.pdf', 'pdf_horizontal.pdf'];
+$excluded = ['test.pdf', 'pdf_horizontal.pdf'];
 
 // Obtener PDFs originales
 $files = glob($DOC_DIR . '/*.pdf');
@@ -90,6 +94,11 @@ foreach ($files as $filePath) {
 
     // Si se pide 1 solo archivo, filtrar
     if (!empty($singleFile) && $fileName !== $singleFile) {
+        continue;
+    }
+
+    // Si se pide lista específica de archivos, filtrar por esa lista
+    if (!empty($filesList) && !in_array($fileName, $filesList, true)) {
         continue;
     }
 
