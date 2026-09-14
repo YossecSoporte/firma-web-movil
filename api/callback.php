@@ -142,7 +142,7 @@ $logEntry = [
     'received_at' => date('c'),
     'job' => $jobId,
     'success' => (bool) $success,
-    'code' => (int) $code,
+    'code' => $code,
     'message' => $message,
     'data' => $data,
     'token' => $bearerToken ?: null,
@@ -161,7 +161,7 @@ if (file_exists($summaryFile)) {
 $summary['job'] = $jobId;
 $summary['last_callback_at'] = date('c');
 $summary['success'] = (bool) $success;
-$summary['code'] = (int) $code;
+$summary['code'] = $code;
 $summary['message'] = $message;
 
 if (!isset($summary['callbacks'])) {
@@ -170,7 +170,7 @@ if (!isset($summary['callbacks'])) {
 $summary['callbacks'][] = [
     'at' => date('c'),
     'success' => (bool) $success,
-    'code' => (int) $code,
+    'code' => $code,
     'message' => $message,
     'data' => $data
 ];
