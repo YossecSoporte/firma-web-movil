@@ -509,3 +509,105 @@ La app móvil descifra `data` con la misma cadena (HKDF + AES-256-GCM inverso) p
 7. La app descifra `data`, valida `exp` y consulta `GET {url}` (sección 2.3).
 8. La app descarga el PDF desde `from`, lo firma y lo sube a `to`.
 9. Cuando el lote termina, tu webhook recibe el callback (sección 2.5).
+
+---
+
+## 7. Códigos de error
+
+Los siguientes códigos pertenecen a la app, servicios de red o servidor. Pueden mostrarse en pantalla; llegar al callback depende de la etapa y de que ya se conozca el manifiesto/destino. No todos los errores de pantalla producen callback. Los mensajes concretos pueden cambiar o incluir el nombre del PDF.
+
+### Enlace y descifrado
+
+| Código | Significado |
+|---|---|
+| `APP-100` | Esquema/acción/formato de enlace inválido o falta data. |
+| `APP-101` | Blob no válido como Base64/Base64URL. |
+| `APP-102` | Blob demasiado corto para IV y tag. |
+| `APP-103` | Falló autenticación AES-GCM: tag inválido, contenido alterado o claves incompatibles. |
+| `APP-104` | Contenido descifrado inválido. |
+| `APP-105` | URL del job inválida. |
+| `APP-106` | Expiración ausente o con formato inválido. |
+| `APP-107` | Enlace expirado. |
+| `APP-108` | Código reservado para token requerido; en esta entrada token es opcional. |
+| `APP-109` | Cancelación explícita del usuario. |
+| `APP-111` | Dominio del job o redirección no autorizado por allowed_domains de la sesión. |
+
+### Sesión
+
+| Código | Significado |
+|---|---|
+| `NET-200` | Sin conexión a Internet. |
+| `APP-210` | Token de sesión vacío. |
+| `APP-216` | Respuesta de sesión incompleta. |
+| `SRV-211` | Error general al iniciar sesión. |
+| `SRV-212` | No autorizado (HTTP 401/403). |
+| `SRV-213` | HTTP 410: recurso expirado/no disponible; puede indicar token ya usado. |
+| `SRV-214` | Timeout o conexión lenta en inicio de sesión. |
+| `SRV-215` | Cuota agotada o HTTP 429 en sesión. |
+
+### Consulta y validación del job
+
+| Código | Significado |
+|---|---|
+| `NET-300` / `NET-301` | Conexión fallida / timeout al obtener el job. |
+| `SRV-300` | Job: HTTP 400. |
+| `SRV-301` | Job: HTTP 404. |
+| `SRV-302` | Job: HTTP 410. |
+| `SRV-303` | Job: HTTP 5xx. |
+| `SRV-304` | Job: HTTP 401/403. |
+| `SRV-305` | Job: HTTP 429. |
+| `SRV-306` | Otro error HTTP del job. |
+| `APP-304` | Job/configuración ausente o respuesta inválida; también política batch inválida. |
+| `APP-305` | Falta identificador job. |
+| `APP-306` | URL callback inválida. |
+| `APP-310` | Lista de documentos vacía o ausente. |
+| `APP-311` | document_code ausente/inválido. |
+| `APP-312` | document_code duplicado. |
+| `APP-313` | URL from inválida. |
+| `APP-314` | URL to inválida. |
+| `APP-315` | name_pdf inválido. |
+| `APP-316` | doc_sha256 no tiene 64 caracteres hexadecimales. |
+
+### Descarga, imágenes e integridad
+
+| Código | Significado |
+|---|---|
+| `APP-320` | PDF sin URL de descarga. |
+| `APP-406` | Documento descargado vacío. |
+| `APP-407` | Error local/de conexión/timeout de descarga sin código HTTP específico. |
+| `APP-408` | Fallo al descargar imagen de firma. |
+| `APP-409` | Imagen de firma inválida. |
+| `SRV-400` | Error HTTP de descarga genérico, incluido 400. |
+| `SRV-401` | Descarga no autorizada: HTTP 401/403. |
+| `SRV-404` | PDF no encontrado: HTTP 404. |
+| `SRV-405` | PDF no disponible: HTTP 410. |
+| `SRV-408` | Error de servidor al descargar: HTTP 5xx. |
+| `SRV-409` | Demasiadas solicitudes de descarga: HTTP 429. |
+| `NET-400` | Código definido para ausencia de red en descarga; no todos los fallos de red se mapean a él. |
+| `APP-500` | Falta huella para verificar integridad. |
+| `APP-501` | SHA-256 no coincide. |
+| `APP-502` | No existe el archivo local a verificar. |
+| `APP-503` | No se puede leer el PDF para calcular su hash. |
+
+### Firma y subida
+
+| Código | Significado |
+|---|---|
+| `APP-600` | Fallo de firma / operación de firma bloqueada. |
+| `APP-601` | La firma no devolvió documentos/resultados. |
+| `APP-602` | Fallo parcial de firma. |
+| `APP-700` | Ningún documento firmado tiene subida confirmada, o fallo global de subida. |
+| `APP-701` | Subida parcial: algunos resultados no tienen entrega confirmada. |
+| `APP-900` | Error inesperado del flujo. |
+
+### Consumo y cierre (posteriores al callback de subida)
+
+| Código | Significado |
+|---|---|
+| `SRV-600` | Error general al registrar consumo. |
+| `SRV-601` | Sesión cerrada al registrar consumo. |
+| `SRV-602` | Timeout al registrar consumo. |
+| `SRV-700` | Error general al cerrar sesión. |
+| `SRV-701` | Timeout al cerrar sesión. |
+
+Estos últimos códigos forman parte del catálogo interno. No debe esperarse un nuevo callback terminal por esas tareas posteriores.
