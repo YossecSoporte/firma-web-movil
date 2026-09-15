@@ -6,6 +6,7 @@
  */
 
 const STORAGE_DIR = __DIR__ . '/../storage/auth_jobs';
+const AUTH_KEYS_FILE = __DIR__ . '/../storage/auth_keys.json';
 const EXPIRACION_SEGUNDOS = 600;
 
 header('Access-Control-Allow-Origin: *');
@@ -30,38 +31,61 @@ $accepted_issuers = $data['accepted_issuers'] ?? [];
 if (!is_array($accepted_issuers)) $accepted_issuers = [];
 
 $job = generateUuidV4();
-$exp = time() + EXPIRACION_SEGUNDOS;
+$jti = generateUuidV4();
+$now = time();
+$exp = $now + EXPIRACION_SEGUNDOS;
 
 $jobData = [
     'job' => $job,
+    'jti' => $jti,
     'exp' => $exp,
     'purpose' => 'authentication',
     'display_name' => $display_name,
     'accepted_issuers' => $accepted_issuers,
-    'created_at' => time(),
+    'created_at' => $now,
 ];
 
 $storageFile = STORAGE_DIR . '/' . $job . '.json';
 file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
-$payload = json_encode([
-    'job' => $job,
-    'exp' => $exp,
+$claims = [
+    'iss' => 'firmeasy-web',
+    'aud' => 'firmeasy-signer',
     'purpose' => 'authentication',
+    'iat' => $now,
+    'nbf' => $now,
+    'exp' => $exp,
+    'jti' => $jti,
+    'job' => $job,
     'display_name' => $display_name,
     'accepted_issuers' => $accepted_issuers,
-]);
+];
 
+$claimsJson = json_encode($claims, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+$signature = signEd25519($claimsJson, AUTH_KEYS_FILE);
+
+// Envelope firmado
+$envelope = [
+    'claims' => $claims,
+    'sig' => base64url_encode($signature),
+];
+
+// Cifrar envelope
+$payload = json_encode($envelope, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 $blob = encryptAesGcm($payload, $ENCRYPTION_KEY);
 $deepLink = 'firmeasy://auth?data=' . $blob;
 
 header('Content-Type: application/json; charset=utf-8');
+$keys = json_decode(file_get_contents(AUTH_KEYS_FILE), true);
 echo json_encode([
     'job' => $job,
+    'jti' => $jti,
     'exp' => $exp,
     'deep_link' => $deepLink,
     'data' => $blob,
     'display_name' => $display_name,
+    'claims' => $claims,
+    'public_key' => $keys['public_key'] ?? null,
 ], JSON_UNESCAPED_SLASHES);
 
 function encryptAesGcm(string $plaintext, string $key): string {
@@ -71,6 +95,23 @@ function encryptAesGcm(string $plaintext, string $key): string {
     if ($ciphertext === false) throw new Exception('Error encriptando');
     $blob = $iv . $ciphertext . $tag;
     return rtrim(strtr(base64_encode($blob), '+/', '-_'), '=');
+}
+function base64url_encode(string $data): string {
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+function base64url_decode(string $data): string {
+    $pad = strlen($data) % 4;
+    if ($pad) $data .= str_repeat('=', 4 - $pad);
+    return base64_decode(strtr($data, '-_', '+/'));
+}
+function signEd25519(string $message, string $keysFile): string {
+    if (!file_exists($keysFile)) throw new Exception('auth_keys.json no encontrado');
+    $keys = json_decode(file_get_contents($keysFile), true);
+    if (empty($keys['secret_key'])) throw new Exception('secret_key ausente');
+    $secret = sodium_base642bin($keys['secret_key'], SODIUM_BASE64_VARIANT_ORIGINAL);
+    // sodium_crypto_sign_detached requiere secreto de firma de 64 bytes
+    $signature = sodium_crypto_sign_detached($message, $secret);
+    return $signature;
 }
 function generateUuidV4(): string {
     $data = random_bytes(16);
