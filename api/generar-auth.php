@@ -32,12 +32,14 @@ if (!is_array($accepted_issuers)) $accepted_issuers = [];
 
 $job = generateUuidV4();
 $jti = generateUuidV4();
+$state = generateUuidV4();
 $now = time();
 $exp = $now + EXPIRACION_SEGUNDOS;
 
 $jobData = [
     'job' => $job,
     'jti' => $jti,
+    'state' => $state,
     'exp' => $exp,
     'purpose' => 'authentication',
     'display_name' => $display_name,
@@ -57,8 +59,11 @@ $claims = [
     'exp' => $exp,
     'jti' => $jti,
     'job' => $job,
+    'state' => $state,
     'display_name' => $display_name,
     'accepted_issuers' => $accepted_issuers,
+    'challenge_url' => $BASE_URL_EXTERNO . '/api/auth/challenge.php?state=' . $state,
+    'submit_url' => $BASE_URL_EXTERNO . '/api/auth/submit.php',
 ];
 
 $claimsJson = json_encode($claims, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -80,6 +85,7 @@ $keys = json_decode(file_get_contents(AUTH_KEYS_FILE), true);
 echo json_encode([
     'job' => $job,
     'jti' => $jti,
+    'state' => $state,
     'exp' => $exp,
     'deep_link' => $deepLink,
     'data' => $blob,
