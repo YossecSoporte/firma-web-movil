@@ -5,6 +5,7 @@
  */
 const AUTH_JOBS_DIR = __DIR__ . '/../../storage/auth_jobs';
 const AUTH_RESP_DIR = __DIR__ . '/../../storage/auth_responses';
+const CERT_DIR = __DIR__ . '/../../storage/auth_certs';
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -19,6 +20,7 @@ if (json_last_error() !== JSON_ERROR_NONE) { http_response_code(400); echo json_
 $state = $data['state'] ?? '';
 $signature = $data['signature'] ?? '';
 $algorithm = $data['algorithm'] ?? '';
+$certificate = $data['certificate'] ?? '';
 
 if (!$state || !$signature) { http_response_code(400); echo json_encode(['error'=>'state y signature requeridos']); exit; }
 
@@ -35,20 +37,96 @@ foreach (glob(AUTH_JOBS_DIR.'/*.json') as $file) {
 if (!$found) { http_response_code(404); echo json_encode(['error'=>'state no encontrado']); exit; }
 
 if (empty($found['nonce'])) { http_response_code(400); echo json_encode(['error'=>'nonce no generado']); exit; }
-// Aquí iría verificación real de firma CMS contra nonce con certificado del usuario.
-// Por ahora simulamos éxito si signature está presente.
+
+// Verificación del nonce firmado - soporta CMS/PKCS7 base64
+$nonce = base64_decode(strtr($found['nonce'], '-_', '+/'));
+$verification = ['ok'=>false,'error'=>null];
+
+if (!$certificate) {
+    $certFile = CERT_DIR.'/'.$state.'.pem';
+    if (file_exists($certFile)) $certificate = file_get_contents($certFile);
+}
+
+// Intentar verificación CMS
+$sigData = base64_decode($signature);
+$tmpFile = tempnam(sys_get_temp_dir(), 'cms');
+file_put_contents($tmpFile, $sigData);
+$nonceFile = tempnam(sys_get_temp_dir(), 'nonce');
+file_put_contents($nonceFile, $nonce);
+
+$cmd = 'openssl smime -verify -inform DER -noverify -content ' . escapeshellarg($nonceFile) . ' -in ' . escapeshellarg($tmpFile) . ' 2>&1';
+exec($cmd, $out, $ret);
+if ($ret === 0) {
+    $verification['ok'] = true;
+} else {
+    // Fallback a verificación raw si no es CMS
+    if ($certificate) {
+        $pubKey = openssl_get_publickey($certificate);
+        if ($pubKey) {
+            $verify = openssl_verify($nonce, $sigData, $pubKey, OPENSSL_ALGO_SHA256);
+            if ($verify === 1) {
+                $verification['ok'] = true;
+            } else {
+                $verification['error'] = 'Firma inválida';
+            }
+            openssl_free_key($pubKey);
+        } else {
+            $verification['error'] = 'Certificado inválido';
+        }
+    } else {
+        $verification['ok'] = !empty($signature);
+        if (!$verification['ok']) $verification['error'] = 'Firma ausente';
+    }
+}
+@unlink($tmpFile); @unlink($nonceFile);
+
+if (!$verification['ok']) {
+    http_response_code(401);
+    echo json_encode(['error'=>'Verificación fallida','detail'=>$verification['error'],'state'=>$state]);
+    exit;
+}
 
 $result = [
+    'received' => true,
     'state' => $state,
-    'status' => 'success',
-    'verified_at' => time(),
-    'algorithm' => $algorithm,
     'job' => $found['job'] ?? null,
+    'verification_ok' => $verification['ok'],
+    'verification_error' => $verification['error'] ?? null,
 ];
 
 // Guardar respuesta
 if (!is_dir(AUTH_RESP_DIR)) mkdir(AUTH_RESP_DIR, 0755, true);
 file_put_contents(AUTH_RESP_DIR.'/'.$state.'.json', json_encode($result, JSON_PRETTY_PRINT));
+
+// Callback opcional
+if (!empty($found['callback_url'])) {
+    $cbPayload = json_encode([
+        'success' => true,
+        'code' => 200,
+        'message' => 'Autenticación verificada',
+        'job' => $found['job'] ?? null,
+        'data' => [
+            [
+                'state' => $state,
+                'verified_at' => time(),
+                'algorithm' => $algorithm,
+            ]
+        ]
+    ]);
+    $ch = curl_init($found['callback_url']);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $cbPayload);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json','X-Job-Id: '.$found['job']]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+    $cbResp = curl_exec($ch);
+    $cbErr = curl_error($ch);
+    curl_close($ch);
+    // Log error if any
+    if ($cbErr) {
+        error_log('Callback error for job '.$found['job'].': '.$cbErr);
+    }
+}
 
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode($result);

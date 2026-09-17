@@ -13,6 +13,7 @@ services:
       - PHP_MAX_EXECUTION_TIME=60
       - BASE_URL_EXTERNO=http://localhost:8081
       - ENCRYPTION_KEY=l1L0gPaxGHkH/aei5Hs7awe8XhPrHHtzywfZYF+mTc0=
+      - ENCRYPTION_KEY_AUTH=ntuBM00n3Er7u/KH2SPd8BME9BnMDnuuEhIOR7tW7r0=
       - FIRMEASY_API_KEY=sk_live_DvkVAvtOjMc4604AzWM8kruHtu9V4RjN
     restart: unless-stopped
     healthcheck:

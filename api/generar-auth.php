@@ -15,10 +15,10 @@ header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['error'=>'Método no permitido']); exit; }
 
-$ENCRYPTION_KEY_B64 = getenv('ENCRYPTION_KEY');
-if (empty($ENCRYPTION_KEY_B64)) { http_response_code(500); echo json_encode(['error'=>'ENCRYPTION_KEY no configurada']); exit; }
+$ENCRYPTION_KEY_B64 = getenv('ENCRYPTION_KEY_AUTH');
+if (empty($ENCRYPTION_KEY_B64)) { http_response_code(500); echo json_encode(['error'=>'ENCRYPTION_KEY_AUTH no configurada']); exit; }
 $ENCRYPTION_KEY = base64_decode($ENCRYPTION_KEY_B64);
-if (strlen($ENCRYPTION_KEY) !== 32) { http_response_code(500); echo json_encode(['error'=>'ENCRYPTION_KEY debe ser 32 bytes']); exit; }
+if (strlen($ENCRYPTION_KEY) !== 32) { http_response_code(500); echo json_encode(['error'=>'ENCRYPTION_KEY_AUTH debe ser 32 bytes']); exit; }
 
 $BASE_URL_EXTERNO = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://localhost:8081', '/');
 
@@ -27,8 +27,9 @@ $data = json_decode($input, true);
 if (json_last_error() !== JSON_ERROR_NONE) { http_response_code(400); echo json_encode(['error'=>'JSON inválido']); exit; }
 
 $display_name = $data['display_name'] ?? 'Autenticación FirmEasy';
-$accepted_issuers = $data['accepted_issuers'] ?? [];
-if (!is_array($accepted_issuers)) $accepted_issuers = [];
+$accepted_issuers = $data['accepted_issuers'] ?? ["CN=AC RAIZ001, O=RENIEC, C=PE","CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE","CN=ECEP-RENIEC CAClass 2,O=Registro Nacional de Identificación y Estado Civil,C=PE"];
+if (!is_array($accepted_issuers)) $accepted_issuers = ["CN=AC RAIZ001, O=RENIEC, C=PE","CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE","CN=ECEP-RENIEC CAClass 2,O=Registro Nacional de Identificación y Estado Civil,C=PE"];
+$callback_url = $data['callback_url'] ?? 'http://localhost:8081/api/auth/callback.php';
 
 $job = generateUuidV4();
 $jti = generateUuidV4();
@@ -44,6 +45,7 @@ $jobData = [
     'purpose' => 'authentication',
     'display_name' => $display_name,
     'accepted_issuers' => $accepted_issuers,
+    'callback_url' => $callback_url,
     'created_at' => $now,
 ];
 
@@ -62,8 +64,9 @@ $claims = [
     'state' => $state,
     'display_name' => $display_name,
     'accepted_issuers' => $accepted_issuers,
-    'challenge_url' => $BASE_URL_EXTERNO . '/api/auth/challenge.php?state=' . $state,
-    'submit_url' => $BASE_URL_EXTERNO . '/api/auth/submit.php',
+    'challenge_url' => 'http://localhost:8081/api/auth/challenge.php?state=' . $state,
+    'submit_url' => 'http://localhost:8081/api/auth/submit.php',
+    'callback_url' => $callback_url,
 ];
 
 $claimsJson = json_encode($claims, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -81,7 +84,6 @@ $blob = encryptAesGcm($payload, $ENCRYPTION_KEY);
 $deepLink = 'firmeasy://auth?data=' . $blob;
 
 header('Content-Type: application/json; charset=utf-8');
-$keys = json_decode(file_get_contents(AUTH_KEYS_FILE), true);
 echo json_encode([
     'job' => $job,
     'jti' => $jti,
@@ -91,7 +93,6 @@ echo json_encode([
     'data' => $blob,
     'display_name' => $display_name,
     'claims' => $claims,
-    'public_key' => $keys['public_key'] ?? null,
 ], JSON_UNESCAPED_SLASHES);
 
 function encryptAesGcm(string $plaintext, string $key): string {
