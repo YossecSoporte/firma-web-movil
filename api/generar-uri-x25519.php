@@ -40,8 +40,8 @@ const EXPIRACION_SEGUNDOS = 600; // 10 minutos
 const KEYS_DIR = __DIR__ . '/../storage/keys';
 const DEFAULT_KID = 'default';
 
-// Base URL del sistema externo
-$BASE_URL_EXTERNO = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://localhost:8081', '/');
+// Base URL del sistema externo (fija = IP del host a la que llega el celular por USB tethering)
+$BASE_URL_EXTERNO = 'http://localhost:8081';
 
 // Cargar par de claves estático de FirmEasy (server)
 $FIRMEASY_KEYS_FILE = __DIR__ . '/../storage/firmeasy_keys.json';

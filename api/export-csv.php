@@ -31,20 +31,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$BASE_URL = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://localhost:8081', '/');
+$BASE_URL = 'http://localhost:8081';
 $DOC_DIR  = __DIR__ . '/../document';
 $SIGNED_DIR = $DOC_DIR . '/signed';
 
 // Parámetros de configuración de firma (con defaults sensatos)
-$x          = isset($_GET['x'])          ? (int)$_GET['x']          : 10;
-$y          = isset($_GET['y'])          ? (int)$_GET['y']          : 30;
-$width      = isset($_GET['width'])      ? (int)$_GET['width']      : 210;
-$height     = isset($_GET['height'])     ? (int)$_GET['height']     : 100;
-$page       = isset($_GET['page'])       ? (int)$_GET['page']       : 1;
-$textSize   = isset($_GET['text_size'])  ? (int)$_GET['text_size']  : 10;
+$x          = isset($_GET['x'])          ? (int)$_GET['x']          : 66;
+$y          = isset($_GET['y'])          ? (int)$_GET['y']          : 567;
+$width      = isset($_GET['width'])      ? (int)$_GET['width']      : 200;
+$height     = isset($_GET['height'])     ? (int)$_GET['height']     : 58;
+$page       = isset($_GET['page'])       ? (int)$_GET['page']       : 6;
+$textSize   = isset($_GET['text_size'])  ? (int)$_GET['text_size']  : 11;
 $rotation   = isset($_GET['rotation'])   ? (int)$_GET['rotation']   : 0;
-$graphic    = $_GET['graphic']  ?? 'https://images.unsplash.com/photo-1560361586-8242b1fc06c5?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTJ8fGNvY2hlJTIwbnVldm98ZW58MHx8MHx8fDA%3D';
-$text       = $_GET['text']     ?? '';
+$graphic    = $_GET['graphic']  ?? 'https://s-console.tokeniza.io/logo_enviado_firmador.png';
+$text       = $_GET['text']     ?? '<SIGNER>\nOriginator Demo S.A.\nRepresentante legal\nMotivo: CEDER CARTERA\nFecha: <DATE>';
 $visible    = $_GET['visible']  ?? 'true';
 $toUrlOverride = $_GET['to_url'] ?? '';
 $fromUrlOverride = $_GET['from_url'] ?? '';

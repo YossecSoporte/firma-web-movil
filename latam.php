@@ -95,6 +95,11 @@
     .btn-sign-firma10:hover:not(:disabled) { background: #5a32a3; }
     .btn-action svg { width: 14px; height: 14px; flex-shrink: 0; }
 
+    /* ===== Botón de configuración flotante ===== */
+    #btnSettings { position: fixed; bottom: 16px; right: 16px; z-index: 999; }
+    #settingsPanel input, #settingsPanel textarea, #settingsPanel select { font-family: inherit; }
+    #settingsPanel label { cursor: pointer; }
+
     /* ===== Cards (móvil) ===== */
     .cards-mobile { display: none; flex-direction: column; gap: 12px; }
     .doc-card {
@@ -195,6 +200,37 @@
         <span id="refreshLabel">Actualizar</span>
         </button>
       </div>
+    </div>
+
+    <!-- ===== PANEL DE CONFIGURACIÓN DE FIRMA ===== -->
+    <button id="btnSettings" class="refresh-btn" type="button" style="position:fixed;bottom:16px;right:16px;z-index:999;background:#6f42c1;color:#fff;border-color:#6f42c1;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Config Firma
+    </button>
+    <div id="settingsPanel" style="display:none;position:fixed;bottom:60px;right:16px;z-index:999;background:#fff;border:1px solid #dee2e6;border-radius:8px;padding:16px;width:320px;box-shadow:0 4px 20px rgba(0,0,0,.15);">
+      <h4 style="margin:0 0 10px;font-size:.85rem;color:#6f42c1;">Configuración de Firma CSV</h4>
+      <label style="font-size:.75rem;color:#495057;display:block;margin-bottom:2px;">Width</label>
+      <input id="setWidth" type="number" value="200" style="width:100%;padding:5px 8px;font-size:.8rem;border:1px solid #ced4da;border-radius:4px;margin-bottom:8px;box-sizing:border-box;">
+      <label style="font-size:.75rem;color:#495057;display:block;margin-bottom:2px;">Height</label>
+      <input id="setHeight" type="number" value="58" style="width:100%;padding:5px 8px;font-size:.8rem;border:1px solid #ced4da;border-radius:4px;margin-bottom:8px;box-sizing:border-box;">
+      <label style="font-size:.75rem;color:#495057;display:block;margin-bottom:2px;">Texto (visualText)</label>
+      <textarea id="setText" style="width:100%;padding:5px 8px;font-size:.75rem;border:1px solid #ced4da;border-radius:4px;height:60px;margin-bottom:8px;resize:vertical;box-sizing:border-box;"></textarea>
+      <label style="font-size:.75rem;color:#495057;display:block;margin-bottom:2px;">Image URL</label>
+      <input id="setGraphic" type="url" value="https://s-console.tokeniza.io/logo_enviado_firmador.png" style="width:100%;padding:5px 8px;font-size:.8rem;border:1px solid #ced4da;border-radius:4px;margin-bottom:8px;box-sizing:border-box;">
+      <label style="font-size:.75rem;color:#495057;display:block;margin-bottom:2px;">Page</label>
+      <input id="setPage" type="number" value="6" style="width:100%;padding:5px 8px;font-size:.8rem;border:1px solid #ced4da;border-radius:4px;margin-bottom:8px;box-sizing:border-box;">
+      <label style="font-size:.75rem;color:#495057;display:block;margin-bottom:2px;">Text Size</label>
+      <input id="setTextSize" type="number" value="11" style="width:100%;padding:5px 8px;font-size:.8rem;border:1px solid #ced4da;border-radius:4px;margin-bottom:8px;box-sizing:border-box;">
+      <label style="font-size:.75rem;color:#495057;display:block;margin-bottom:2px;">Rotation</label>
+      <input id="setRotation" type="number" value="0" style="width:100%;padding:5px 8px;font-size:.8rem;border:1px solid #ced4da;border-radius:4px;margin-bottom:8px;box-sizing:border-box;">
+      <label style="font-size:.75rem;color:#495057;display:block;margin-bottom:4px;">Modo de firma</label>
+      <select id="setMode" style="width:100%;padding:5px 8px;font-size:.8rem;border:1px solid #ced4da;border-radius:4px;margin-bottom:8px;box-sizing:border-box;">
+        <option value="texto">Firma texto</option>
+        <option value="imagen">Firma imagen</option>
+        <option value="imagen-texto">Firma imagen + texto</option>
+      </select>
+      <button id="btnSaveSettings" class="refresh-btn" type="button" style="width:100%;background:#28a745;color:#fff;border-color:#28a745;">Guardar</button>
+      <button id="btnResetSettings" class="refresh-btn" type="button" style="width:100%;background:#6c757d;color:#fff;border-color:#6c757d;margin-top:4px;">Resetear</button>
     </div>
 
     <!-- Tabla para escritorio -->
@@ -302,6 +338,14 @@
 
 <script>
     (function () {
+      if (!crypto.randomUUID) {
+        crypto.randomUUID = function() {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+        };
+      }
       // ===== CONFIGURACIÓN =====
       const API_URL             = '/api/generar-uri.php';
       const LIST_URL            = '/api/list-pdfs.php';
@@ -310,11 +354,54 @@
       const DOWNLOAD_SIGNED_URL = '/api/download-signed.php';
       const CLEAR_SIGNED_URL    = '/api/clear-signed.php';
       const ACTION              = 'sign';
+      const BASE_URL          = 'http://localhost:8081';
       const CALLBACK_URL     = '/api/callback.php';
-      const CALLBACK_ENDPOINT = window.location.origin + '/api/callback.php';
+      const CALLBACK_ENDPOINT = BASE_URL + '/api/callback.php';
       const FALLBACK_URL        = 'app-no-instalada.php';
       const FALLBACK_DELAY_MS   = 3500;
       const VISIBILITY_GRACE_MS = 5000;
+
+      // ===== SETTINGS DE FIRMA (editables desde UI) =====
+      const SIGN_SETTINGS = {
+        mode: 'texto', // texto | imagen | imagen-texto
+        width: 200, height: 58,
+        text: '<SIGNER>\nOriginator Demo S.A.\nRepresentante legal\nMotivo: CEDER CARTERA\nFecha: <DATE>',
+        graphic: 'https://s-console.tokeniza.io/logo_enviado_firmador.png',
+        page: 6, text_size: 11, rotation: 0, visible: true
+      };
+
+      function getSignParams() {
+        var p = {
+          x: 66, y: 567,
+          width: SIGN_SETTINGS.width,
+          height: SIGN_SETTINGS.height,
+          page: SIGN_SETTINGS.page,
+          text_size: SIGN_SETTINGS.text_size,
+          rotation: SIGN_SETTINGS.rotation,
+          visible: SIGN_SETTINGS.visible ? 'true' : 'false'
+        };
+        if (SIGN_SETTINGS.mode === 'texto') {
+          p.text = SIGN_SETTINGS.text;
+          p.graphic = '';
+        } else if (SIGN_SETTINGS.mode === 'imagen') {
+          p.text = '';
+          p.graphic = SIGN_SETTINGS.graphic;
+        } else {
+          p.text = SIGN_SETTINGS.text;
+          p.graphic = SIGN_SETTINGS.graphic;
+        }
+        return p;
+      }
+
+      function buildCsvParams(extra) {
+        var p = getSignParams();
+        var csv = 'x=' + p.x + '&y=' + p.y + '&width=' + p.width + '&height=' + p.height;
+        csv += '&text=' + encodeURIComponent(p.text);
+        csv += '&graphic=' + encodeURIComponent(p.graphic);
+        csv += '&page=' + p.page + '&text_size=' + p.text_size + '&rotation=' + p.rotation + '&visible=' + p.visible;
+        if (extra) csv += extra;
+        return csv;
+      }
 
       // ===== ELEMENTOS =====
       const tbody       = document.getElementById('docsBody');
@@ -698,6 +785,58 @@
           await doSign(file, '', certificateType);
         }
       });
+
+      // ===== PANEL DE CONFIGURACIÓN DE FIRMA =====
+      (function() {
+        var btnSettings = document.getElementById('btnSettings');
+        var panel = document.getElementById('settingsPanel');
+        var btnSave = document.getElementById('btnSaveSettings');
+        var btnReset = document.getElementById('btnResetSettings');
+
+        btnSettings.addEventListener('click', function() {
+          panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        });
+
+        function loadSettingsToForm() {
+          document.getElementById('setWidth').value = SIGN_SETTINGS.width;
+          document.getElementById('setHeight').value = SIGN_SETTINGS.height;
+          document.getElementById('setText').value = SIGN_SETTINGS.text;
+          document.getElementById('setGraphic').value = SIGN_SETTINGS.graphic;
+          document.getElementById('setPage').value = SIGN_SETTINGS.page;
+          document.getElementById('setTextSize').value = SIGN_SETTINGS.text_size;
+          document.getElementById('setRotation').value = SIGN_SETTINGS.rotation;
+          document.getElementById('setMode').value = SIGN_SETTINGS.mode;
+        }
+
+        function saveFormToSettings() {
+          SIGN_SETTINGS.width = parseInt(document.getElementById('setWidth').value) || 200;
+          SIGN_SETTINGS.height = parseInt(document.getElementById('setHeight').value) || 58;
+          SIGN_SETTINGS.text = document.getElementById('setText').value;
+          SIGN_SETTINGS.graphic = document.getElementById('setGraphic').value || '';
+          SIGN_SETTINGS.page = parseInt(document.getElementById('setPage').value) || 1;
+          SIGN_SETTINGS.text_size = parseInt(document.getElementById('setTextSize').value) || 10;
+          SIGN_SETTINGS.rotation = parseInt(document.getElementById('setRotation').value) || 0;
+          SIGN_SETTINGS.mode = document.getElementById('setMode').value;
+        }
+
+        btnSave.addEventListener('click', function() {
+          saveFormToSettings();
+          panel.style.display = 'none';
+          showStatus('Configuración de firma actualizada.', 'success');
+          setTimeout(function() { showStatus('', 'info'); }, 3000);
+        });
+
+        btnReset.addEventListener('click', function() {
+          SIGN_SETTINGS.mode = 'texto'; SIGN_SETTINGS.width = 200; SIGN_SETTINGS.height = 58;
+          SIGN_SETTINGS.text = '<SIGNER>\nOriginator Demo S.A.\nRepresentante legal\nMotivo: CEDER CARTERA\nFecha: <DATE>';
+          SIGN_SETTINGS.graphic = 'https://s-console.tokeniza.io/logo_enviado_firmador.png';
+          SIGN_SETTINGS.page = 6; SIGN_SETTINGS.text_size = 11; SIGN_SETTINGS.rotation = 0;
+          loadSettingsToForm();
+          showStatus('Configuración reseteada.', 'info');
+        });
+
+        loadSettingsToForm();
+      })();
 
       // Cerrar modal con Escape
       document.addEventListener('keydown', function(e) {
@@ -1359,18 +1498,17 @@
           var tokenData = await tokenResp.json();
           var tokenIntegration = tokenData.token_integration;
 
-          var csvParams = 'file=' + encodeURIComponent(fileName);
-          csvParams += '&text=<SIGNER>\\nFecha: <DATE>\\nOU: <OU>\\nCARGO: <TITLE>\\nFirmado por Firmeasy.legal';
-          var csvUrl = window.location.origin + '/api/export-csv.php?' + csvParams;
-          var deepLink = 'firmeasyenterprise://?batch_csv=' + encodeURIComponent(csvUrl) + '&token_integration=' + encodeURIComponent(tokenIntegration);
+var csvParams = 'file=' + encodeURIComponent(fileName) + '&' + buildCsvParams();
+           var csvUrl = BASE_URL + '/api/export-csv.php?' + csvParams;
+           var deepLink = 'firmeasyenterprise://?batch_csv=' + encodeURIComponent(csvUrl) + '&token_integration=' + encodeURIComponent(tokenIntegration);
 
-          console.log('=== FIRMEASY DEEP LINK (SINGLE CSV) ===');
-          console.log('Deep Link:', deepLink);
-          console.log('CSV URL:', csvUrl);
+           console.log('=== FIRMEASY DEEP LINK (SINGLE CSV) ===');
+           console.log('Deep Link:', deepLink);
+           console.log('CSV URL:', csvUrl);
 
-          var deepLinkDisplay = document.getElementById('deepLinkDisplay');
-          document.getElementById('deepLinkUri').textContent = deepLink;
-          document.getElementById('deepLinkJson').textContent = JSON.stringify({ batch_csv: csvUrl, token_integration: tokenIntegration, exp: tokenData.exp, file: fileName, text: '<SIGNER>\nFecha: <DATE>\nOU: <OU>\nCARGO: <TITLE>\nFirmado por Firmeasy.legal' }, null, 2);
+           var deepLinkDisplay = document.getElementById('deepLinkDisplay');
+           document.getElementById('deepLinkUri').textContent = deepLink;
+            document.getElementById('deepLinkJson').textContent = JSON.stringify({ batch_csv: csvUrl, token_integration: tokenIntegration, exp: tokenData.exp, file: fileName, ...getSignParams() }, null, 2);
           deepLinkDisplay.style.display = 'block';
 
           showStatus('Abriendo app FirmEasy para firmar ' + fileName + '...', 'info');
@@ -1396,9 +1534,9 @@
           var tokenData = await tokenResp.json();
           var tokenIntegration = tokenData.token_integration;
 
-          var failUrl = window.location.origin + '/api/upload-signed-fail.php?file=' + encodeURIComponent(fileName);
-          var csvParams = 'file=' + encodeURIComponent(fileName) + '&to_url=' + encodeURIComponent(failUrl);
-          var csvUrl = window.location.origin + '/api/export-csv.php?' + csvParams;
+var failUrl = BASE_URL + '/api/upload-signed-fail.php?file=' + encodeURIComponent(fileName);
+           var csvParams = 'file=' + encodeURIComponent(fileName) + '&' + buildCsvParams('&to_url=' + encodeURIComponent(failUrl));
+          var csvUrl = BASE_URL + '/api/export-csv.php?' + csvParams;
           var deepLink = 'firmeasyenterprise://?batch_csv=' + encodeURIComponent(csvUrl) + '&token_integration=' + encodeURIComponent(tokenIntegration);
 
           console.log('=== FIRMEASY DEEP LINK (FAIL CSV) ===');
@@ -1408,7 +1546,7 @@
 
           var deepLinkDisplay = document.getElementById('deepLinkDisplay');
           document.getElementById('deepLinkUri').textContent = deepLink;
-          document.getElementById('deepLinkJson').textContent = JSON.stringify({ batch_csv: csvUrl, token_integration: tokenIntegration, exp: tokenData.exp, file: fileName, to_url: failUrl, expect: 'UPLOAD_FAIL' }, null, 2);
+          document.getElementById('deepLinkJson').textContent = JSON.stringify({ batch_csv: csvUrl, token_integration: tokenIntegration, exp: tokenData.exp, file: fileName, to_url: failUrl, expect: 'UPLOAD_FAIL', ...getSignParams() }, null, 2);
           deepLinkDisplay.style.display = 'block';
 
           showStatus('Abriendo app FirmEasy (subida fallida) para ' + fileName + '...', 'info');
@@ -1434,19 +1572,19 @@
           var tokenData = await tokenResp.json();
           var tokenIntegration = tokenData.token_integration;
 
-          var failUrl = window.location.origin + '/api/download-fail.php?file=' + encodeURIComponent(fileName);
-          var csvParams = 'file=' + encodeURIComponent(fileName) + '&from_url=' + encodeURIComponent(failUrl);
-          var csvUrl = window.location.origin + '/api/export-csv.php?' + csvParams;
-          var deepLink = 'firmeasyenterprise://?batch_csv=' + encodeURIComponent(csvUrl) + '&token_integration=' + encodeURIComponent(tokenIntegration);
+var failUrl = BASE_URL + '/api/download-fail.php?file=' + encodeURIComponent(fileName);
+           var csvParams = 'file=' + encodeURIComponent(fileName) + '&' + buildCsvParams('&from_url=' + encodeURIComponent(failUrl));
+           var csvUrl = BASE_URL + '/api/export-csv.php?' + csvParams;
+           var deepLink = 'firmeasyenterprise://?batch_csv=' + encodeURIComponent(csvUrl) + '&token_integration=' + encodeURIComponent(tokenIntegration);
 
-          console.log('=== FIRMEASY DEEP LINK (DOWNLOAD FAIL CSV) ===');
-          console.log('Deep Link:', deepLink);
-          console.log('CSV URL:', csvUrl);
-          console.log('Fail URL:', failUrl);
+           console.log('=== FIRMEASY DEEP LINK (DOWNLOAD FAIL CSV) ===');
+           console.log('Deep Link:', deepLink);
+           console.log('CSV URL:', csvUrl);
+           console.log('Fail URL:', failUrl);
 
-          var deepLinkDisplay = document.getElementById('deepLinkDisplay');
-          document.getElementById('deepLinkUri').textContent = deepLink;
-          document.getElementById('deepLinkJson').textContent = JSON.stringify({ batch_csv: csvUrl, token_integration: tokenIntegration, exp: tokenData.exp, file: fileName, from_url: failUrl, expect: 'DOWNLOAD_FAIL' }, null, 2);
+           var deepLinkDisplay = document.getElementById('deepLinkDisplay');
+           document.getElementById('deepLinkUri').textContent = deepLink;
+           document.getElementById('deepLinkJson').textContent = JSON.stringify({ batch_csv: csvUrl, token_integration: tokenIntegration, exp: tokenData.exp, file: fileName, from_url: failUrl, expect: 'DOWNLOAD_FAIL', ...getSignParams() }, null, 2);
           deepLinkDisplay.style.display = 'block';
 
           showStatus('Abriendo app FirmEasy (descarga fallida) para ' + fileName + '...', 'info');
@@ -1481,18 +1619,18 @@
           var tokenData = await tokenResp.json();
           var tokenIntegration = tokenData.token_integration;
 
-          var csvParams = 'text=<SIGNER>\\nFecha: <DATE>\\nOU: <OU>\\nCARGO: <TITLE>\\nFirmado por Firmeasy.legal';
-          var csvUrl = window.location.origin + '/api/export-csv.php?' + csvParams;
-          var deepLink = 'firmeasyenterprise://?batch_csv=' + encodeURIComponent(csvUrl) + '&token_integration=' + encodeURIComponent(tokenIntegration);
+var csvParams = buildCsvParams('');
+           var csvUrl = BASE_URL + '/api/export-csv.php?' + csvParams;
+           var deepLink = 'firmeasyenterprise://?batch_csv=' + encodeURIComponent(csvUrl) + '&token_integration=' + encodeURIComponent(tokenIntegration);
 
-          console.log('=== FIRMEASY DEEP LINK (BATCH CSV) ===');
-          console.log('Deep Link:', deepLink);
-          console.log('CSV URL:', csvUrl);
-          console.log('Token:', tokenIntegration);
+           console.log('=== FIRMEASY DEEP LINK (BATCH CSV) ===');
+           console.log('Deep Link:', deepLink);
+           console.log('CSV URL:', csvUrl);
+           console.log('Token:', tokenIntegration);
 
-          var deepLinkDisplay = document.getElementById('deepLinkDisplay');
-          document.getElementById('deepLinkUri').textContent = deepLink;
-          document.getElementById('deepLinkJson').textContent = JSON.stringify({ batch_csv: csvUrl, token_integration: tokenIntegration, exp: tokenData.exp, documentos: pending.length, text: '<SIGNER>\nFecha: <DATE>\nOU: <OU>\nCARGO: <TITLE>\nFirmado por Firmeasy.legal' }, null, 2);
+           var deepLinkDisplay = document.getElementById('deepLinkDisplay');
+           document.getElementById('deepLinkUri').textContent = deepLink;
+           document.getElementById('deepLinkJson').textContent = JSON.stringify({ batch_csv: csvUrl, token_integration: tokenIntegration, exp: tokenData.exp, documentos: pending.length, ...getSignParams() }, null, 2);
           deepLinkDisplay.style.display = 'block';
 
           showStatus('Abriendo app FirmEasy para firma en bloque (' + pending.length + ' docs)...', 'info');
@@ -1781,9 +1919,9 @@
           var tokenIntegration = tokenData.token_integration;
 
           var csvParams = 'files=' + encodeURIComponent(FIRMA10_FILES.join(','));
-          csvParams += '&x=300&y=15&width=150&height=50';
-          csvParams += '&text=<SIGNER>\\nFecha: <DATE>\\nOU: <OU>\\nCARGO: <TITLE>\\nFirmado por Firmeasy.legal';
-          var csvUrl = window.location.origin + '/api/export-csv.php?' + csvParams;
+csvParams += '&x=66&y=567&width=200&height=58';
+csvParams += '&text=<SIGNER>\\nOriginator Demo S.A.\\nRepresentante legal\\nMotivo: CEDER CARTERA\\nFecha: <DATE>';
+          var csvUrl = BASE_URL + '/api/export-csv.php?' + csvParams;
           var deepLink = 'firmeasyenterprise://?batch_csv=' + encodeURIComponent(csvUrl) + '&token_integration=' + encodeURIComponent(tokenIntegration);
 
           console.log('=== FIRMEASY DEEP LINK (FIRMA EN 10) ===');
@@ -1793,14 +1931,16 @@
 
           var deepLinkDisplay = document.getElementById('deepLinkDisplay');
           deepLinkDisplay.querySelector('#deepLinkUri').textContent = deepLink;
-          deepLinkDisplay.querySelector('#deepLinkJson').textContent = JSON.stringify({
-            batch_csv: csvUrl,
-            token_integration: tokenIntegration,
-            exp: tokenData.exp,
-            files: FIRMA10_FILES,
-            coordinates: { x: 300, y: 15, width: 150, height: 50 },
-            text: '<SIGNER>\nFecha: <DATE>\nOU: <OU>\nCARGO: <TITLE>\nFirmado por Firmeasy.legal'
-          }, null, 2);
+deepLinkDisplay.querySelector('#deepLinkJson').textContent = JSON.stringify({
+             batch_csv: csvUrl,
+             token_integration: tokenIntegration,
+             exp: tokenData.exp,
+             files: FIRMA10_FILES,
+             coordinates: { x: 66, y: 567, width: 200, height: 58 },
+             text: '<SIGNER>\nOriginator Demo S.A.\nRepresentante legal\nMotivo: CEDER CARTERA\nFecha: <DATE>',
+             graphic: 'https://s-console.tokeniza.io/logo_enviado_firmador.png',
+             page: 6, text_size: 11, rotation: 0, visible: true
+           }, null, 2);
           deepLinkDisplay.style.display = 'block';
 
           showStatus('Abriendo app FirmEasy para Firma en 10...', 'info');

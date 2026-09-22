@@ -125,6 +125,12 @@ Todos estos pasos se implementan en el **backend de tu empresa**:
         "mode": "continue",
         "retry": 2
       }
+    },
+    "customization": {
+      "logo": "https://mi-empresa.com/assets/logo.png",
+      "primary_color": "#0066cc",
+      "secondary_color": "#28a745",
+      "tertiary_color": "#ffc107"
     }
   },
   "documents": [
@@ -191,6 +197,7 @@ La app móvil, tras descifrar `data`, consulta el endpoint GET `{url}` (el valor
 | `purpose` | string | No | `signing` (u otro texto) | **Solo móvil.** Indica el propósito declarado del proceso de firma. Es informativo para la app |
 | `accepted_issuers` | array | No | lista de strings (DN) | **Solo móvil.** Lista de emisores de certificado aceptados. Si se envía, la app **solo** acepta certificados emitidos por esas autoridades (ver detalle abajo) |
 | `batch_error_handling` | object | No | ver estructura | Manejo de errores cuando el lote tiene fallas (ver tabla abajo) |
+| `customization` | object | No | ver estructura | **Personalización de la app** durante el flujo de firma: logo de la empresa y colores en **hexadecimal** (ver tabla abajo) |
 
 **`purpose` — valores:**
 
@@ -242,6 +249,28 @@ Este campo es **solo para la app móvil**: le indica qué credencial digital deb
 | `download.retry` | 0–10 | `0` | Reintentos de descarga por documento |
 | `upload.mode` | `block`, `continue` | `block` | `block` se detiene (evita rate-limit); `continue` sube el resto |
 | `upload.retry` | 0–10 | `0` | Reintentos de subida por documento |
+
+**`customization` (opcional):**
+
+Personaliza la apariencia de la app de firma con la marca de la empresa. Todos los colores se envían en **hexadecimal** (formato `#RRGGBB`).
+
+```json
+"customization": {
+  "logo": "https://mi-empresa.com/assets/logo.png",
+  "primary_color": "#0066cc",
+  "secondary_color": "#28a745",
+  "tertiary_color": "#ffc107"
+}
+```
+
+| Campo | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `logo` | string (URL) | No | URL pública del logo de la empresa. Se muestra en la app durante el flujo de firma |
+| `primary_color` | string (hex) | No | Color principal de la marca (`#RRGGBB`). Se usa en botones y elementos destacados |
+| `secondary_color` | string (hex) | No | Color secundario de la marca (`#RRGGBB`). Se usa en fondos y acentos secundarios |
+| `tertiary_color` | string (hex) | No | Color terciario de la marca (`#RRGGBB`). Se usa en detalles y elementos complementarios |
+
+> Si se omite, la app usa los colores y logo por defecto. Validación esperada: los colores deben cumplir el formato hexadecimal `#RRGGBB` y `logo` debe ser una URL accesible por la app.
 
 #### Nivel documents (array, requerido, mínimo 1)
 

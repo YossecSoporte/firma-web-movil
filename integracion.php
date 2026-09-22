@@ -216,6 +216,30 @@
       </div>
     </div>
 
+    <!-- Personalización (logo + colores hex) -->
+    <div class="customization-panel">
+      <label style="font-weight:600;color:#495057;font-size:.82rem;">Personalización</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+        <input id="customLogo" type="url" placeholder="URL del logo (https://...)"
+          value="https://mi-empresa.com/assets/logo.png"
+          style="flex:2;min-width:220px;padding:7px 10px;font-size:.82rem;border:1px solid #ced4da;border-radius:6px;box-sizing:border-box;">
+        <label style="display:flex;align-items:center;gap:5px;font-size:.8rem;">Primario
+          <input id="customPrimary" type="color" value="#0066cc" title="primary_color (hex)">
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:.8rem;">Secundario
+          <input id="customSecondary" type="color" value="#28a745" title="secondary_color (hex)">
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:.8rem;">Terciario
+          <input id="customTertiary" type="color" value="#ffc107" title="tertiary_color (hex)">
+        </label>
+        <span style="font-size:.72rem;color:#6c757d;">La app los aplica durante la firma</span>
+        <button id="btnSaveCustom" type="button"
+          style="padding:7px 14px;font-size:.82rem;font-weight:600;border:1px solid #0066cc;border-radius:6px;background:#0066cc;color:#fff;cursor:pointer;transition:all .15s;">
+          Guardar
+        </button>
+      </div>
+    </div>
+
     <!-- Acordeón de documentos -->
     <div class="accordion" id="accordion">
       <div class="acc-section open" id="accPending">
@@ -310,6 +334,16 @@
 
 <script>
     (function () {
+      // Polyfill crypto.randomUUID (no disponible en HTTP por IP, solo localhost/HTTPS)
+      if (!crypto.randomUUID) {
+        crypto.randomUUID = function() {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+        };
+      }
+
       // ===== CONFIGURACIÓN =====
       const API_URL             = '/api/generar-uri-x25519.php';
       const KID                 = 'android-app';
@@ -328,7 +362,7 @@
       // ===== WHITELIST: solo estos 10 PDFs en la página /integracion =====
       const PDF_WHITELIST = [
         'doc_prueba1.pdf', 'doc_prueba2.pdf', 'doc_prueba3.pdf', 'doc_prueba4.pdf', 'doc_prueba5.pdf',
-        'doc_prueba6.pdf', 'doc_prueba7.pdf', 'doc_prueba8.pdf', 'doc_prueba9.pdf', 'doc_prueba10.pdf'
+        'manifiesto-12.pdf', 'doc_prueba7.pdf', 'doc_prueba8.pdf', 'doc_prueba9.pdf', 'manifiesto-11.pdf'
       ];
 
       // ===== Deep link X25519: firmeasy://integration?data=<BLOB>&sid=<TOKEN> =====
@@ -426,7 +460,10 @@
                     showStatus('PDF firmado detectado. Actualizando lista...', 'success');
                     showCallbackToast(cb);
                     setTimeout(function () { showStatus('', 'info'); }, 3000);
-                    loadPdfList();
+loadCustomization();
+      document.getElementById('btnSaveCustom').addEventListener('click', saveCustomization);
+
+      loadPdfList();
                   }
                 })
                 .catch(function () { /* retry */ })
@@ -481,6 +518,46 @@
         };
       }
 
+      function getCustomization() {
+        var logo = document.getElementById('customLogo').value.trim();
+        var primary = document.getElementById('customPrimary').value;
+        var secondary = document.getElementById('customSecondary').value;
+        var tertiary = document.getElementById('customTertiary').value;
+        var c = {};
+        if (logo) c.logo = logo;
+        if (primary) c.primary_color = primary;
+        if (secondary) c.secondary_color = secondary;
+        if (tertiary) c.tertiary_color = tertiary;
+        return Object.keys(c).length ? c : null;
+      }
+
+      function loadCustomization() {
+        try {
+          var saved = JSON.parse(localStorage.getItem('firmeasy_customization') || '{}');
+          if (saved.logo !== undefined) document.getElementById('customLogo').value = saved.logo;
+          if (saved.primary_color !== undefined) document.getElementById('customPrimary').value = saved.primary_color;
+          if (saved.secondary_color !== undefined) document.getElementById('customSecondary').value = saved.secondary_color;
+          if (saved.tertiary_color !== undefined) document.getElementById('customTertiary').value = saved.tertiary_color;
+        } catch (e) { /* localStorage no disponible */ }
+      }
+
+      function saveCustomization() {
+        try {
+          localStorage.setItem('firmeasy_customization', JSON.stringify(getCustomization() || {}));
+          var b = document.getElementById('btnSaveCustom');
+          b.textContent = 'Guardado';
+          b.style.background = '#28a745';
+          b.style.borderColor = '#28a745';
+          setTimeout(function () {
+            b.textContent = 'Guardar';
+            b.style.background = '#0066cc';
+            b.style.borderColor = '#0066cc';
+          }, 1500);
+        } catch (e) {
+          alert('No se pudo guardar la personalización en este navegador.');
+        }
+      }
+
       function buildJobDisplayJson(data, userToken, certificateType, extraConfig) {
         var cfg = {
           signature_type: 'basic',
@@ -489,7 +566,8 @@
           certificate_type: certificateType,
           purpose: 'signing',
           accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
-          batch_error_handling: getBatchErrorHandling()
+          batch_error_handling: getBatchErrorHandling(),
+          customization: getCustomization()
         };
         if (extraConfig) Object.assign(cfg, extraConfig);
         return JSON.stringify({
@@ -780,7 +858,8 @@
                 certificate_type: certificateType,
                 purpose: 'signing',
                 accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
-                batch_error_handling: getBatchErrorHandling()
+                batch_error_handling: getBatchErrorHandling(),
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -869,7 +948,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -954,7 +1034,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1040,7 +1121,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1126,7 +1208,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1212,7 +1295,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'authentication',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1298,7 +1382,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1394,7 +1479,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: 'all',
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: '', kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1513,7 +1599,8 @@
                 certificate_type: certificateType,
                 purpose: 'signing',
                 accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
-                batch_error_handling: getBatchErrorHandling()
+                batch_error_handling: getBatchErrorHandling(),
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1595,7 +1682,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1659,7 +1747,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1724,7 +1813,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1783,7 +1873,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1840,7 +1931,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -1898,7 +1990,8 @@
                 generate_request: 'NOMBRE EMPRESA',
                 certificate_type: certificateType,
                 purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE']
+                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -2008,7 +2101,8 @@
                 certificate_type: certificateType,
                 purpose: 'signing',
                 accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
-                batch_error_handling: getBatchErrorHandling()
+                batch_error_handling: getBatchErrorHandling(),
+                customization: getCustomization()
               },
               token: userToken, kid: KID,
               callback: CALLBACK_ENDPOINT,
@@ -2088,7 +2182,8 @@
                 signature_type: 'basic', signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType,
                 purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
-                batch_error_handling: { download: { mode: 'continue', retry: 1 }, upload: { mode: 'continue', retry: 1 } }
+                batch_error_handling: { download: { mode: 'continue', retry: 1 }, upload: { mode: 'continue', retry: 1 } },
+                customization: getCustomization()
               },
               token: userToken, kid: KID, callback: CALLBACK_ENDPOINT, documents: documents
             }),
@@ -2148,7 +2243,8 @@
                 signature_type: 'basic', signature_reason: 'Acepto el contenido del documento',
                 generate_request: 'NOMBRE EMPRESA', certificate_type: certificateType,
                 purpose: 'signing', accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
-                batch_error_handling: { download: { mode: 'continue', retry: 1 }, upload: { mode: 'continue', retry: 1 } }
+                batch_error_handling: { download: { mode: 'continue', retry: 1 }, upload: { mode: 'continue', retry: 1 } },
+                customization: getCustomization()
               },
               token: userToken, kid: KID, callback: CALLBACK_ENDPOINT, documents: documents
             }),

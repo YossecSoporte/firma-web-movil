@@ -13,7 +13,7 @@
     }
     .card {
       background: #fff; border-radius: 12px; padding: 24px; width: 100%;
-      max-width: 800px; box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      max-width: 1400px; box-shadow: 0 2px 12px rgba(0,0,0,.08);
     }
     h1 { font-size: 1.5rem; margin-bottom: 8px; color: #1a1a1a; text-align: center; }
     p.subtitle { color: #666; margin-bottom: 20px; font-size: .9rem; text-align: center; }
@@ -181,12 +181,41 @@
       #specialTable { display: none; }
       #cardsSpecial { display: flex !important; }
     }
+    .dashboard-grid { display:grid; grid-template-columns:minmax(0, 3fr) minmax(0, 2fr); gap:20px; align-items:start; }
+    .dashboard-panel { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; box-shadow:0 4px 16px rgba(15,23,42,.05); }
+    .documents-panel { min-width:0; }
+    .panel-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .panel-heading h2 { margin:0; font-size:1.1rem; color:#1e293b; }
+    .panel-hint { color:#64748b; font-size:.8rem; }
+    .main-nav { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:0 0 20px; padding:10px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:12px; }
+    .main-nav a { color:#334155; text-decoration:none; font-size:.85rem; font-weight:600; padding:8px 12px; border-radius:8px; }
+    .main-nav a:hover { background:#e0ecff; color:#1d4ed8; }
+    .reports-panel { position:sticky; top:18px; }
+    .quick-links { display:grid; gap:9px; }
+    .tools-links { grid-template-columns:repeat(4, minmax(0, 1fr)); }
+    .quick-link { display:flex; align-items:center; gap:11px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; color:#1e293b; text-decoration:none; transition:background .15s,border-color .15s; }
+    .quick-link:hover { background:#f8fafc; border-color:#93c5fd; }
+    .quick-link strong,.quick-link small { display:block; }
+    .quick-link small { margin-top:2px; color:#64748b; font-size:.78rem; }
+    .quick-icon { width:30px; height:30px; display:grid; place-items:center; border-radius:8px; background:#eff6ff; color:#2563eb; font-weight:700; }
+    .report-note { margin-top:16px; padding:14px; border-radius:10px; background:#f8fafc; color:#334155; font-size:.85rem; }
+    .report-note p { margin:6px 0 12px; color:#64748b; line-height:1.45; }
+    .report-button { display:inline-block; background:#2563eb; color:#fff; padding:8px 12px; border-radius:8px; text-decoration:none; font-size:.82rem; font-weight:600; }
+    @media(max-width:1024px){ .dashboard-grid { grid-template-columns:1fr; } .reports-panel { position:static; } }
+    @media(max-width:760px){ .tools-links { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>Firmar documentos</h1>
     <p class="subtitle">Selecciona un documento y presiona Firmar para abrir FirmEasy.</p>
+
+    <nav class="main-nav" aria-label="Reportes y herramientas">
+      <a href="/callbacks">↗ Callbacks</a>
+      <a href="/autentificacion">✓ Autenticación</a>
+      <a href="/integracion">⌘ Integración Enterprise</a>
+      <a href="/keys">⚿ Claves</a>
+    </nav>
 
     <div class="toolbar">
       <span id="docCount" class="count">Cargando...</span>
@@ -215,6 +244,13 @@
         <a href="/callbacks" class="refresh-btn" style="color:#6f42c1;border-color:#6f42c1;text-decoration:none;">Callbacks</a>
       </div>
     </div>
+
+    <div class="dashboard-grid">
+      <section class="dashboard-panel documents-panel">
+        <div class="panel-heading">
+          <h2>Documentos PDF</h2>
+          <span class="panel-hint">Pendientes y firmados</span>
+        </div>
 
     <!-- Acordeón de documentos -->
     <div class="accordion" id="accordion">
@@ -298,16 +334,25 @@
       </div>
     </div>
 
-    <div id="statusBar" class="status-bar"></div>
+      </section>
 
-    <div id="deepLinkDisplay" class="deep-link-display">
-      <strong>URI generada:</strong>
-      <div id="deepLinkUri" style="margin-top: 4px;"></div>
-      <div style="margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 8px;">
-        <strong>JSON del job:</strong>
-        <pre id="deepLinkJson" style="margin: 4px 0 0; white-space: pre-wrap; font-size: .7rem; color: #334155;"></pre>
-      </div>
+      <aside class="dashboard-panel reports-panel">
+        <div class="panel-heading">
+          <h2>URI generada</h2>
+          <span class="panel-hint">Última solicitud</span>
+        </div>
+        <div id="deepLinkDisplay" class="deep-link-display" style="margin:0;">
+          <strong>URI generada:</strong>
+          <div id="deepLinkUri" style="margin-top: 4px;"></div>
+          <div style="margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 8px;">
+            <strong>JSON del job:</strong>
+            <pre id="deepLinkJson" style="margin: 4px 0 0; white-space: pre-wrap; font-size: .7rem; color: #334155;"></pre>
+          </div>
+        </div>
+      </aside>
     </div>
+
+    <div id="statusBar" class="status-bar"></div>
 
     <div class="footer">Requiere app FirmEasy instalada en este dispositivo.</div>
   </div>
@@ -369,6 +414,15 @@
 
 <script>
     (function () {
+      // Polyfill crypto.randomUUID
+      if (!crypto.randomUUID) {
+        crypto.randomUUID = function() {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+        };
+      }
       // ===== CONFIGURACIÓN =====
       const API_URL             = '/api/generar-uri.php';
       const LIST_URL            = '/api/list-pdfs.php';
@@ -2002,7 +2056,8 @@
           showStatus('No hay documentos pendientes para Bloque 10.', 'error');
           return;
         }
-        pendingBloque10Files = pending.slice(0, 10);
+        var manifiesto = pending.filter(function(f) { return f.startsWith('manifiesto-'); });
+        pendingBloque10Files = manifiesto.length >= 10 ? manifiesto.slice(0, 10) : pending.slice(0, 10);
         if (pendingBloque10Files.length < 10) {
           showStatus('Solo hay ' + pendingBloque10Files.length + ' documentos pendientes (se necesitan 10).', 'error');
           return;
