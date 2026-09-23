@@ -610,7 +610,9 @@ loadCustomization();
         var isSigned = signedMap.hasOwnProperty(base);
         var si = signedMap[base];
         var signedUrl = si ? (DOWNLOAD_SIGNED_URL + '?file=' + encodeURIComponent(si.filename)) : '#';
-        var viewUrl = DOWNLOAD_URL + '?file=' + encodeURIComponent(f.filename);
+        var viewUrl = (isSigned && si)
+          ? (DOWNLOAD_SIGNED_URL + '?file=' + encodeURIComponent(si.filename))
+          : (DOWNLOAD_URL + '?file=' + encodeURIComponent(f.filename));
         var statusHtml = isSigned
           ? '<span class="doc-status status-signed">Firmado</span>'
           : '<span class="doc-status status-pending">Pendiente</span>';
