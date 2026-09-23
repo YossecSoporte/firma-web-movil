@@ -225,12 +225,15 @@
           style="flex:2;min-width:220px;padding:7px 10px;font-size:.82rem;border:1px solid #ced4da;border-radius:6px;box-sizing:border-box;">
         <label style="display:flex;align-items:center;gap:5px;font-size:.8rem;">Primario
           <input id="customPrimary" type="color" value="#0066cc" title="primary_color (hex)">
+          <input id="customPrimaryText" type="text" value="#0066cc" spellcheck="false" style="width:82px;padding:4px 6px;font-size:.78rem;border:1px solid #ced4da;border-radius:5px;box-sizing:border-box;">
         </label>
         <label style="display:flex;align-items:center;gap:5px;font-size:.8rem;">Secundario
           <input id="customSecondary" type="color" value="#28a745" title="secondary_color (hex)">
+          <input id="customSecondaryText" type="text" value="#28a745" spellcheck="false" style="width:82px;padding:4px 6px;font-size:.78rem;border:1px solid #ced4da;border-radius:5px;box-sizing:border-box;">
         </label>
         <label style="display:flex;align-items:center;gap:5px;font-size:.8rem;">Terciario
           <input id="customTertiary" type="color" value="#ffc107" title="tertiary_color (hex)">
+          <input id="customTertiaryText" type="text" value="#ffc107" spellcheck="false" style="width:82px;padding:4px 6px;font-size:.78rem;border:1px solid #ced4da;border-radius:5px;box-sizing:border-box;">
         </label>
         <span style="font-size:.72rem;color:#6c757d;">La app los aplica durante la firma</span>
         <button id="btnSaveCustom" type="button"
@@ -533,10 +536,43 @@
         try {
           var saved = JSON.parse(localStorage.getItem('firmeasy_customization') || '{}');
           if (saved.logo !== undefined) document.getElementById('customLogo').value = saved.logo;
-          if (saved.primary_color !== undefined) document.getElementById('customPrimary').value = saved.primary_color;
-          if (saved.secondary_color !== undefined) document.getElementById('customSecondary').value = saved.secondary_color;
-          if (saved.tertiary_color !== undefined) document.getElementById('customTertiary').value = saved.tertiary_color;
+          if (saved.primary_color !== undefined) {
+            document.getElementById('customPrimary').value = saved.primary_color;
+            document.getElementById('customPrimaryText').value = saved.primary_color;
+          }
+          if (saved.secondary_color !== undefined) {
+            document.getElementById('customSecondary').value = saved.secondary_color;
+            document.getElementById('customSecondaryText').value = saved.secondary_color;
+          }
+          if (saved.tertiary_color !== undefined) {
+            document.getElementById('customTertiary').value = saved.tertiary_color;
+            document.getElementById('customTertiaryText').value = saved.tertiary_color;
+          }
         } catch (e) { /* localStorage no disponible */ }
+      }
+
+      function syncColorText(inputId, textId) {
+        var picker = document.getElementById(inputId);
+        var text = document.getElementById(textId);
+        if (!picker || !text) return;
+        picker.addEventListener('input', function() { text.value = picker.value; });
+        text.addEventListener('blur', function() {
+          var v = String(text.value).trim().toLowerCase();
+          if (/^#[0-9a-f]{6}$/.test(v)) {
+            picker.value = v;
+          } else {
+            text.value = picker.value;
+          }
+        });
+        text.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { text.blur(); }
+        });
+      }
+
+      function initColorSync() {
+        syncColorText('customPrimary', 'customPrimaryText');
+        syncColorText('customSecondary', 'customSecondaryText');
+        syncColorText('customTertiary', 'customTertiaryText');
       }
 
       function saveCustomization() {
@@ -2266,6 +2302,7 @@
 
       // ===== INIT =====
       loadCustomization();
+      initColorSync();
       document.getElementById('btnSaveCustom').addEventListener('click', saveCustomization);
       btnRefresh.addEventListener('click', refreshAll);
       btnBatch.addEventListener('click', openAppBatch);
