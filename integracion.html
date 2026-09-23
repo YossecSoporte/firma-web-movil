@@ -461,10 +461,7 @@
                     showStatus('PDF firmado detectado. Actualizando lista...', 'success');
                     showCallbackToast(cb);
                     setTimeout(function () { showStatus('', 'info'); }, 3000);
-loadCustomization();
-      document.getElementById('btnSaveCustom').addEventListener('click', saveCustomization);
-
-      loadPdfList();
+                    loadPdfList();
                   }
                 })
                 .catch(function () { /* retry */ })
@@ -2268,6 +2265,8 @@ loadCustomization();
       }
 
       // ===== INIT =====
+      loadCustomization();
+      document.getElementById('btnSaveCustom').addEventListener('click', saveCustomization);
       btnRefresh.addEventListener('click', refreshAll);
       btnBatch.addEventListener('click', openAppBatch);
       document.getElementById('btnBloque10').addEventListener('click', openBloque10);

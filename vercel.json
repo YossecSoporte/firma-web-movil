@@ -6,6 +6,7 @@
     "api/list-signed.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 10},
     "api/download-signed.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 15},
     "api/list-pdfs.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 10, "includeFiles": "document/**"},
+    "api/clear-signed.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 10},
     "api/download.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 15, "includeFiles": "document/**"},
     "api/register-key.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 10},
     "api/list-keys.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 10},
