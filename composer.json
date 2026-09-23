@@ -1,14 +1,1 @@
-﻿{
-  "name": "yossecsoporte/firma-web-movil",
-  "version": "1.0.0",
-  "description": "FirmEasy Web ÔÇö backend PHP para firma digital m├│vil",
-  "require": {
-    "php": ">=8.1",
-    "ext-openssl": "*",
-    "ext-curl": "*",
-    "ext-json": "*"
-  },
-  "config": {
-    "optimize-autoloader": true
-  }
-}
+{  "name": "yossecsoporte/firma-web-movil",  "version": "1.0.0",  "description": "FirmEasy Web ÔÇö backend PHP para firma digital m├│vil",  "require": {    "php": ">=8.1",    "ext-openssl": "*",    "ext-curl": "*",    "ext-json": "*"  },  "config": {    "optimize-autoloader": true  }}
