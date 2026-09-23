@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Vercel Blob REST helper (protocolo del SDK oficial @vercel/blob)
