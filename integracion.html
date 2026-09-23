@@ -192,21 +192,10 @@
       <span id="docCount" class="count">Cargando...</span>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <div style="display:flex;gap:0;">
-          <button id="btnBloque10" class="refresh-btn btn-sign-bloque10" type="button" style="border-radius:6px 0 0 6px;">
+          <button id="btnBloque10" class="refresh-btn btn-sign-bloque10" type="button" style="border-radius:6px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
             <span id="bloque10Label">Bloque 10</span>
           </button>
-          <button id="btnBatchSign" class="refresh-btn" type="button" disabled style="border-radius:0 6px 6px 0;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            <span id="batchLabel">Firma en bloque</span>
-          </button>
-          <select id="batchMode" class="batch-mode-picker" title="Modo de firma en bloque">
-            <option value="normal">Normal</option>
-            <option value="sin_settings">Sin settings</option>
-            <option value="solo_imagen">Solo imagen</option>
-            <option value="imagen_texto">Imagen + texto</option>
-            <option value="todas_hojas">Todas las hojas</option>
-          </select>
         </div>
         <button id="btnRefresh" class="refresh-btn" type="button">
           <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
@@ -382,7 +371,6 @@
       const btnRefresh  = document.getElementById('btnRefresh');
       const refreshIcon = document.getElementById('refreshIcon');
       const refreshLabel = document.getElementById('refreshLabel');
-      const btnBatch    = document.getElementById('btnBatchSign');
       let pollingTimer  = null;
 
       let signedMap = {};
@@ -614,9 +602,6 @@
       }
 
       var BATCH_EXCLUDED = [];
-      function isTodasHojas(fn) {
-        return fn === 'doc_prueba7.pdf';
-      }
 
       // ===== CARGA DE LISTAS =====
       async function loadSignedList() {
@@ -691,7 +676,6 @@
 
           window._pdfFiles = visibleFiles;
           var pendingCount = visibleFiles.filter(function(f) { return !signedMap.hasOwnProperty(baseName(f.filename)); }).length;
-          btnBatch.disabled = pendingCount < 2;
 
           var pendingHtml = '';
           var signedHtml = '';
@@ -758,13 +742,10 @@
       // ===== FIRMAR =====
       let pendingFile = null;
       let pendingFileGitHub = null;
-      let pendingFileSinSettings = null;
       let pendingFileSoloImagen = null;
       let pendingFileImgText = null;
       let pendingFileTodasHojas = null;
       let pendingFileAuth = null;
-      let pendingBatch = false;
-      let pendingFilesList = [];
 
       function showSignModal(file) {
         pendingFile = file;
@@ -774,12 +755,6 @@
 
       function showSignModalGitHub(file) {
         pendingFileGitHub = file;
-        document.getElementById('modalCertType').value = 'all';
-        document.getElementById('signModal').classList.add('open');
-      }
-
-      function showSignModalSinSettings(file) {
-        pendingFileSinSettings = file;
         document.getElementById('modalCertType').value = 'all';
         document.getElementById('signModal').classList.add('open');
       }
@@ -808,40 +783,23 @@
         document.getElementById('signModal').classList.add('open');
       }
 
-      function showSignModalBatch(files) {
-        pendingBatch = true;
-        pendingFilesList = files;
-        document.getElementById('modalCertType').value = 'all';
-        document.getElementById('signModal').classList.add('open');
-      }
-
       function hideSignModal() {
         document.getElementById('signModal').classList.remove('open');
         pendingFile = null;
         pendingFileGitHub = null;
-        pendingFileSinSettings = null;
         pendingFileSoloImagen = null;
         pendingFileImgText = null;
         pendingFileTodasHojas = null;
         pendingFileAuth = null;
-        pendingBatch = false;
-        pendingFilesList = [];
       }
 
       document.getElementById('modalCancel').addEventListener('click', hideSignModal);
       document.getElementById('modalConfirm').addEventListener('click', async function() {
         const certificateType = document.getElementById('modalCertType').value;
-        if (pendingBatch) {
-          hideSignModal();
-          await doSignBatch('', certificateType);
-        } else if (pendingFileGitHub) {
+        if (pendingFileGitHub) {
           const file = pendingFileGitHub;
           hideSignModal();
           await doSignGitHub(file, '', certificateType);
-        } else if (pendingFileSinSettings) {
-          const file = pendingFileSinSettings;
-          hideSignModal();
-          await doSignSinSettings(file, '', certificateType);
         } else if (pendingFileSoloImagen) {
           const file = pendingFileSoloImagen;
           hideSignModal();
@@ -935,90 +893,6 @@
         console.log('Plain:', data.uri_plain);
 
          showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + '...', 'info');
-
-        const start = Date.now();
-        let fallbackTriggered = false;
-        const timer = setTimeout(function () {
-          if (fallbackTriggered) return;
-          if (Date.now() - start < VISIBILITY_GRACE_MS && document.visibilityState === 'visible') {
-            fallbackTriggered = true;
-            window.location.href = FALLBACK_URL;
-          }
-        }, FALLBACK_DELAY_MS);
-
-        function cancelFallback() {
-          if (!fallbackTriggered) { clearTimeout(timer); fallbackTriggered = true; }
-        }
-        document.addEventListener('visibilitychange', function onVis() {
-          if (document.visibilityState === 'hidden') cancelFallback();
-        }, { once: true });
-        window.addEventListener('pagehide', cancelFallback, { once: true });
-        window.addEventListener('blur', cancelFallback, { once: true });
-
-        window.location.href = deepLink;
-
-        startPolling(selectedFile, 60, data.job);
-      }
-
-      // ===== FIRMAR SIN SETTINGS (doc_prueba3.pdf) =====
-      async function doSignSinSettings(selectedFile, userToken, certificateType) {
-        if (!selectedFile) { showStatus('Documento no válido.', 'error'); return; }
-
-        const btn = document.querySelector('.btn-sign-nosettings[data-file="' + escapeAttr(selectedFile) + '"]');
-        const originalHtml = btn ? btn.innerHTML : '';
-        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
-        showStatus('Obteniendo URI de firma (sin settings) para ' + selectedFile + '...', 'info');
-
-        let data;
-        try {
-          const resp = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              configuration: {
-                signature_type: 'basic',
-                signature_reason: 'Acepto el contenido del documento',
-                generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType,
-                purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
-                customization: getCustomization()
-              },
-              token: userToken, kid: KID,
-              callback: CALLBACK_ENDPOINT,
-              documents: [{
-                document_code: crypto.randomUUID(),
-                file: selectedFile, user_id: 'USER123', doc_sha256: ''
-              }]
-            }),
-            credentials: 'same-origin'
-          });
-          if (!resp.ok) {
-            const errData = await resp.json().catch(() => ({}));
-            throw new Error(errData.error || 'HTTP ' + resp.status);
-          }
-          data = await resp.json();
-        } catch (err) {
-          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
-          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
-          return;
-        }
-
-        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
-
-        // Usar URI encriptada para el deep link: firmeasy://integration?data=BLOB
-        const deepLink = buildDeepLink(data);
-
-        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
-        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = buildJobDisplayJson(data, userToken, certificateType);
-        deepLinkDisplay.style.display = 'block';
-
-        console.log('=== FIRMEASY DEEP LINK (SIN SETTINGS) ===');
-        console.log('Encrypted:', deepLink);
-        console.log('Plain:', data.uri_plain);
-
-        showStatus('Abriendo app FirmEasy para firmar ' + selectedFile + ' (sin settings)...', 'info');
 
         const start = Date.now();
         let fallbackTriggered = false;
@@ -1558,7 +1432,7 @@
         showSignModalGitHub(selectedFile);
       }
 
-      // ===== FIRMAR EN BLOQUE =====
+      // ===== UTILIDADES DE FIRMA =====
       function getPendingFiles() {
         var pending = [];
         if (typeof window._pdfFiles !== 'undefined') {
@@ -1570,130 +1444,6 @@
           });
         }
         return pending;
-      }
-
-      function openAppBatch() {
-        var pending = getPendingFiles();
-        if (pending.length === 0) {
-          showStatus('No hay documentos pendientes para firma en bloque.', 'error');
-          return;
-        }
-        showSignModalBatch(pending);
-      }
-
-      async function doSignBatch(userToken, certificateType) {
-        var pending = getPendingFiles();
-        if (pending.length === 0) { showStatus('No hay documentos pendientes.', 'error'); return; }
-
-        var GRAPHIC_URL = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTlcZ50Ci9uRJBet3r17ORbbDGEq-adGoaPS5Hm8L07qD_okGo9F6URTWE&s=10';
-        var SIG_TEXT = 'Firmado digitalmente por:\n<SIGNER>\nFecha: <DATE>\nOU: <OU>\nFirmado con FirmEasy\nMotivo: {{signature_reason}}';
-        var batchMode = document.getElementById('batchMode').value;
-
-        var ICO_WAIT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>';
-        var batchLabel = document.getElementById('batchLabel');
-        var btnBatch = document.getElementById('btnBatchSign');
-        var origLabel = batchLabel.textContent;
-        btnBatch.disabled = true;
-        batchLabel.textContent = 'Preparando...';
-        btnBatch.querySelector('svg').classList.add('spin');
-        showStatus('Generando firma en bloque (' + batchMode + ') para ' + pending.length + ' documentos...', 'info');
-
-        var documents = pending.map(function(file) {
-          var doc = { document_code: crypto.randomUUID(), file: file, user_id: 'USER123', doc_sha256: '' };
-          if (batchMode === 'sin_settings') {
-            // sin settings
-          } else if (batchMode === 'solo_imagen') {
-            doc.settings = { vis_sig_graphic: GRAPHIC_URL };
-          } else if (batchMode === 'imagen_texto') {
-            doc.settings = { vis_sig_graphic: GRAPHIC_URL, vis_sig_text: SIG_TEXT };
-          } else if (batchMode === 'todas_hojas') {
-            doc.settings = { vis_sig_page: -1, vis_sig_text: SIG_TEXT, vis_sig_graphic: GRAPHIC_URL };
-          } else {
-            doc.settings = {
-              vis_sig_x: 340, vis_sig_y: 693, vis_sig_width: 155, vis_sig_height: 55,
-              vis_sig_page: 1, vis_sig_text_size: 10,
-              vis_sig_text: SIG_TEXT,
-              vis_sig_graphic: GRAPHIC_URL
-            };
-          }
-          return doc;
-        });
-
-        var data;
-        try {
-          var resp = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              configuration: {
-                signature_type: 'basic',
-                signature_reason: 'Acepto el contenido del documento',
-                generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType,
-                purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
-                batch_error_handling: getBatchErrorHandling(),
-                customization: getCustomization()
-              },
-              token: userToken, kid: KID,
-              callback: CALLBACK_ENDPOINT,
-              documents: documents
-            }),
-            credentials: 'same-origin'
-          });
-          if (!resp.ok) {
-            var errData = await resp.json().catch(function() { return {}; });
-            throw new Error(errData.error || 'HTTP ' + resp.status);
-          }
-          data = await resp.json();
-        } catch (err) {
-          btnBatch.disabled = false;
-          batchLabel.textContent = origLabel;
-          btnBatch.querySelector('svg').classList.remove('spin');
-          showStatus('No se pudo generar la URI en bloque: ' + err.message, 'error');
-          return;
-        }
-
-        btnBatch.disabled = false;
-        batchLabel.textContent = origLabel;
-        btnBatch.querySelector('svg').classList.remove('spin');
-
-        var deepLink = buildDeepLink(data);
-
-        var deepLinkDisplay = document.getElementById('deepLinkDisplay');
-        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = buildJobDisplayJson(data, userToken, certificateType);
-        deepLinkDisplay.style.display = 'block';
-
-        console.log('=== FIRMEASY DEEP LINK (BLOQUE) ===');
-        console.log('Encrypted:', deepLink);
-        console.log('Plain:', data.uri_plain);
-        console.log('Documentos:', pending.join(', '));
-
-        showStatus('Abriendo app FirmEasy para firmar ' + pending.length + ' documentos...', 'info');
-
-        var start = Date.now();
-        var fallbackTriggered = false;
-        var timer = setTimeout(function () {
-          if (fallbackTriggered) return;
-          if (Date.now() - start < VISIBILITY_GRACE_MS && document.visibilityState === 'visible') {
-            fallbackTriggered = true;
-            window.location.href = FALLBACK_URL;
-          }
-        }, FALLBACK_DELAY_MS);
-
-        function cancelFallback() {
-          if (!fallbackTriggered) { clearTimeout(timer); fallbackTriggered = true; }
-        }
-        document.addEventListener('visibilitychange', function onVis() {
-          if (document.visibilityState === 'hidden') cancelFallback();
-        }, { once: true });
-        window.addEventListener('pagehide', cancelFallback, { once: true });
-        window.addEventListener('blur', cancelFallback, { once: true });
-
-        window.location.href = deepLink;
-
-        startPolling(pending[0], 90, data.job);
       }
 
       // ===== CASOS ESPECIALES DE PRUEBA =====
@@ -1824,65 +1574,6 @@
         console.log('Plain:', data.uri_plain);
 
         showStatus('Abriendo app FirmEasy con PDF roto...', 'info');
-        window.location.href = deepLink;
-        startPolling('doc_prueba1.pdf', 60, data.job);
-      }
-
-      async function doSignNoSettings(userToken, certificateType) {
-        const btn = document.querySelector('[data-test="no-settings"]');
-        const originalHtml = btn ? btn.innerHTML : '';
-        if (btn) { btn.disabled = true; btn.innerHTML = ICO_WAIT + ' Preparando...'; }
-        showStatus('Generando URI sin settings...', 'info');
-
-        let data;
-        try {
-          const resp = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              configuration: {
-                signature_type: 'basic',
-                signature_reason: 'Acepto el contenido del documento',
-                generate_request: 'NOMBRE EMPRESA',
-                certificate_type: certificateType,
-                purpose: 'signing',
-                accepted_issuers: ['CN=AC RAIZ001, O=RENIEC, C=PE', 'CN=FirmEasy SubCA, O=GIRASOL PE SOCIEDAD COMERCIAL DE RESPONSABILIDAD LIMITADA, C=PE'],
-                customization: getCustomization()
-              },
-              token: userToken, kid: KID,
-              callback: CALLBACK_ENDPOINT,
-              documents: [{
-                document_code: crypto.randomUUID(),
-                file: 'doc_prueba1.pdf', user_id: 'USER123', doc_sha256: ''
-              }]
-            }),
-            credentials: 'same-origin'
-          });
-          if (!resp.ok) {
-            const errData = await resp.json().catch(() => ({}));
-            throw new Error(errData.error || 'HTTP ' + resp.status);
-          }
-          data = await resp.json();
-        } catch (err) {
-          if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
-          showStatus('No se pudo obtener la URI: ' + err.message, 'error');
-          return;
-        }
-
-        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
-
-        const deepLink = buildDeepLink(data);
-
-        const deepLinkDisplay = document.getElementById('deepLinkDisplay');
-        document.getElementById('deepLinkUri').textContent = deepLink + '\n\n(Plano: ' + (data.uri_plain || 'N/A') + ')';
-        document.getElementById('deepLinkJson').textContent = buildJobDisplayJson(data, userToken, certificateType);
-        deepLinkDisplay.style.display = 'block';
-
-        console.log('=== FIRMEASY DEEP LINK (SIN SETTINGS) ===');
-        console.log('Encrypted:', deepLink);
-        console.log('Plain:', data.uri_plain);
-
-        showStatus('Abriendo app FirmEasy sin settings...', 'info');
         window.location.href = deepLink;
         startPolling('doc_prueba1.pdf', 60, data.job);
       }
@@ -2305,7 +1996,6 @@
       initColorSync();
       document.getElementById('btnSaveCustom').addEventListener('click', saveCustomization);
       btnRefresh.addEventListener('click', refreshAll);
-      btnBatch.addEventListener('click', openAppBatch);
       document.getElementById('btnBloque10').addEventListener('click', openBloque10);
 
       // Listeners casos especiales
@@ -2320,9 +2010,6 @@
       });
       document.querySelectorAll('[data-test="batch-ul-fail"]').forEach(function(btn) {
         btn.addEventListener('click', function() { showSignModalSpecial('batch-ul-fail'); });
-      });
-      document.querySelectorAll('[data-test="no-settings"]').forEach(function(btn) {
-        btn.addEventListener('click', function() { showSignModalSpecial('no-settings'); });
       });
       document.querySelectorAll('[data-test="only-image"]').forEach(function(btn) {
         btn.addEventListener('click', function() { showSignModalSpecial('only-image'); });
@@ -2349,7 +2036,6 @@
           else if (testType === 'bad-pdf') await doSignBadPdf('', certificateType);
           else if (testType === 'batch-dl-fail') await doSignBatchDownloadFail('', certificateType);
           else if (testType === 'batch-ul-fail') await doSignBatchUploadFail('', certificateType);
-          else if (testType === 'no-settings') await doSignNoSettings('', certificateType);
           else if (testType === 'only-image') await doSignOnlyImage('', certificateType);
           else if (testType === 'only-text') await doSignOnlyText('', certificateType);
           else if (testType === 'both') await doSignBoth('', certificateType);
