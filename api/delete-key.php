@@ -15,6 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 const KEYS_DIR = __DIR__ . '/../storage/keys';
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
 $kid = $_GET['kid'] ?? '';
 if (empty($kid)) {
     http_response_code(400);
@@ -23,15 +26,14 @@ if (empty($kid)) {
 }
 
 $kid = preg_replace('/[^a-zA-Z0-9_-]/', '', $kid);
-$keyFile = KEYS_DIR . '/' . $kid . '.json';
 
-if (!file_exists($keyFile)) {
+if (!storage_exists('keys/' . $kid . '.json')) {
     http_response_code(404);
     echo json_encode(['error' => 'Clave no encontrada para kid: ' . $kid]);
     exit;
 }
 
-unlink($keyFile);
+storage_delete('keys/' . $kid . '.json');
 
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode(['success' => true, 'kid' => $kid], JSON_UNESCAPED_SLASHES);

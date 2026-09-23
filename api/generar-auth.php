@@ -9,6 +9,9 @@ const STORAGE_DIR = __DIR__ . '/../storage/auth_jobs';
 const AUTH_KEYS_FILE = __DIR__ . '/../storage/auth_keys.json';
 const EXPIRACION_SEGUNDOS = 600;
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
@@ -50,7 +53,7 @@ $jobData = [
 ];
 
 $storageFile = STORAGE_DIR . '/' . $job . '.json';
-file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+storage_write_json('auth_jobs/' . $job . '.json', $jobData);
 
 $claims = [
     'iss' => 'firmeasy-web',
@@ -112,8 +115,8 @@ function base64url_decode(string $data): string {
     return base64_decode(strtr($data, '-_', '+/'));
 }
 function signEd25519(string $message, string $keysFile): string {
-    if (!file_exists($keysFile)) throw new Exception('auth_keys.json no encontrado');
-    $keys = json_decode(file_get_contents($keysFile), true);
+    $keys = storage_read_json('auth_keys.json');
+    if ($keys === null) throw new Exception('auth_keys.json no encontrado');
     if (empty($keys['secret_key'])) throw new Exception('secret_key ausente');
     $secret = sodium_base642bin($keys['secret_key'], SODIUM_BASE64_VARIANT_ORIGINAL);
     // sodium_crypto_sign_detached requiere secreto de firma de 64 bytes

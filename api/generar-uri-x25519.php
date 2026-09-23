@@ -40,17 +40,19 @@ const EXPIRACION_SEGUNDOS = 600; // 10 minutos
 const KEYS_DIR = __DIR__ . '/../storage/keys';
 const DEFAULT_KID = 'default';
 
-// Base URL del sistema externo (fija = IP del host a la que llega el celular por USB tethering)
-$BASE_URL_EXTERNO = 'http://localhost:8081';
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
 
-// Cargar par de claves estático de FirmEasy (server)
-$FIRMEASY_KEYS_FILE = __DIR__ . '/../storage/firmeasy_keys.json';
-if (!file_exists($FIRMEASY_KEYS_FILE)) {
+// Base URL del sistema externo (fija = IP del host a la que llega el celular por USB tethering)
+$BASE_URL_EXTERNO = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://localhost:8081', '/');
+
+// Cargar par de claves estático de FirmEasy (server) — Vercel Blob o disco
+$firmeasyKeys = storage_read_json('firmeasy_keys.json');
+if ($firmeasyKeys === null) {
     http_response_code(500);
     echo json_encode(['error' => 'No existe storage/firmeasy_keys.json. Ejecuta gen_keys una vez.']);
     exit;
 }
-$firmeasyKeys = json_decode(file_get_contents($FIRMEASY_KEYS_FILE), true);
 if (empty($firmeasyKeys['secret_key']) || empty($firmeasyKeys['public_key'])) {
     http_response_code(500);
     echo json_encode(['error' => 'firmeasy_keys.json corrupto (falta secret_key o public_key).']);
@@ -97,14 +99,13 @@ if (!isset($data['configuration']) || !isset($data['documents']) || !is_array($d
 $kid = $data['kid'] ?? DEFAULT_KID;
 $kid = preg_replace('/[^a-zA-Z0-9_-]/', '', $kid);
 
-// Cargar pública de la empresa/cliente
-$empresaKeyFile = KEYS_DIR . '/' . $kid . '.json';
-if (!file_exists($empresaKeyFile)) {
+// Cargar pública de la empresa/cliente — Vercel Blob o disco
+$empresaKeyData = storage_read_json('keys/' . $kid . '.json');
+if ($empresaKeyData === null) {
     http_response_code(400);
     echo json_encode(['error' => "No se encontró clave registrada para kid: $kid. Registra la pública con POST /api/register-key.php"]);
     exit;
 }
-$empresaKeyData = json_decode(file_get_contents($empresaKeyFile), true);
 $empresaPublicKey = sodium_base642bin($empresaKeyData['public_key'], SODIUM_BASE64_VARIANT_ORIGINAL);
 
 // Obtener token: usar el del body o auto-obtener de la API FirmEasy
@@ -214,17 +215,8 @@ if (isset($data['configuration']['batch_error_handling']) && is_array($data['con
 $job = generateUuidV4();
 $exp = time() + EXPIRACION_SEGUNDOS;
 
-// Caché SHA-256 persistente en disco
-$sha256Cache = [];
-if (file_exists(SHA256_CACHE_FILE)) {
-    $raw = file_get_contents(SHA256_CACHE_FILE);
-    if ($raw !== false) {
-        $parsed = json_decode($raw, true);
-        if (is_array($parsed)) {
-            $sha256Cache = $parsed;
-        }
-    }
-}
+// Caché SHA-256 persistente (Blob o disco)
+$sha256Cache = storage_read_json('sha256_cache.json') ?? [];
 $cacheModified = false;
 
 // Validar y procesar cada documento (soporta 1 o más documentos — firma en bloque)
@@ -362,9 +354,8 @@ $jobData = [
     'created_at' => time()
 ];
 
-// Guardar en archivo JSON
-$storageFile = STORAGE_DIR . '/' . $job . '.json';
-if (!file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
+// Guardar en archivo JSON (Vercel Blob o disco local)
+if (storage_write_json('jobs/' . $job . '.json', $jobData) === false) {
     http_response_code(500);
     echo json_encode(['error' => 'Error guardando job en almacenamiento']);
     exit;
@@ -372,11 +363,7 @@ if (!file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHE
 
 // Guardar caché SHA-256 si hubo cambios
 if ($cacheModified) {
-    file_put_contents(
-        SHA256_CACHE_FILE,
-        json_encode($sha256Cache, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT),
-        LOCK_EX
-    );
+    storage_write_json('sha256_cache.json', $sha256Cache);
 }
 
 // --- ECDH: secreto compartido (server rx) ---

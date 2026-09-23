@@ -15,14 +15,19 @@
  *   - Máximo 20 MB
  */
 
-$signedDir = realpath(__DIR__ . '/../document/signed');
-if ($signedDir === false) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Directorio document/signed/ no encontrado']);
-    exit;
-}
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+$useBlob = storage_use_blob();
 
-define('SIGNED_DIR', $signedDir);
+if (!$useBlob) {
+    $signedDir = realpath(__DIR__ . '/../document/signed');
+    if ($signedDir === false) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Directorio document/signed/ no encontrado']);
+        exit;
+    }
+    define('SIGNED_DIR', $signedDir);
+}
 define('MAX_FILE_SIZE', 100 * 1024 * 1024);
 
 // CORS
@@ -62,6 +67,31 @@ if (!preg_match('/\.pdf$/i', $requestedFile)) {
     exit;
 }
 
+// Vercel Blob: servir contenido vía función (store privado no permite URL directa)
+if ($useBlob) {
+    $content = storage_read('signed/' . $requestedFile);
+    if ($content === false) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Archivo firmado no encontrado.']);
+        exit;
+    }
+    if (strlen($content) > MAX_FILE_SIZE) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Archivo demasiado grande.']);
+        exit;
+    }
+
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . basename($requestedFile) . '"');
+    header('Content-Length: ' . strlen($content));
+    header('Cache-Control: private, max-age=3600');
+    header('Accept-Ranges: bytes');
+
+    echo $content;
+    exit;
+}
+
+// Disco local (Docker)
 $filePath = SIGNED_DIR . '/' . $requestedFile;
 
 if (!file_exists($filePath)) {

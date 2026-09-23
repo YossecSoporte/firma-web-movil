@@ -1,4 +1,4 @@
-# Configuraciones locales sensibles
+﻿# Configuraciones locales sensibles
 .env
 *.key
 *.pem

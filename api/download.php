@@ -23,6 +23,9 @@ if ($documentDir === false) {
 define('DOCUMENT_DIR', $documentDir);
 define('MAX_FILE_SIZE', 100 * 1024 * 1024); // 100 MB
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
 // CORS
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
@@ -75,14 +78,11 @@ if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
 if (!empty($bearerToken)) {
     $jobId = $_GET['job'] ?? '';
     if (!empty($jobId) && preg_match('/^[a-f0-9-]{36}$/i', $jobId)) {
-        $storageFile = __DIR__ . '/../storage/jobs/' . $jobId . '.json';
-        if (file_exists($storageFile)) {
-            $jobData = json_decode(file_get_contents($storageFile), true);
-            if ($jobData && ($jobData['token'] ?? '') !== $bearerToken) {
-                http_response_code(401);
-                echo json_encode(['error' => 'Token inválido.']);
-                exit;
-            }
+        $jobData = storage_read_json('jobs/' . $jobId . '.json');
+        if ($jobData && ($jobData['token'] ?? '') !== $bearerToken) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Token inválido.']);
+            exit;
         }
     }
 }

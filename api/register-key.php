@@ -15,8 +15,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 const KEYS_DIR = __DIR__ . '/../storage/keys';
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
 if (!is_dir(KEYS_DIR)) {
-    mkdir(KEYS_DIR, 0755, true);
+    if (!storage_use_blob()) {
+        @mkdir(KEYS_DIR, 0755, true);
+    }
 }
 
 $input = file_get_contents('php://input');
@@ -43,13 +48,11 @@ if (empty($kid)) {
 
 $publicKeyB64 = $data['public_key'];
 
-$keyFile = KEYS_DIR . '/' . $kid . '.json';
-
-file_put_contents($keyFile, json_encode([
+storage_write_json('keys/' . $kid . '.json', [
     'kid' => $kid,
     'public_key' => $publicKeyB64,
     'created_at' => date('c'),
-], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+]);
 
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode([

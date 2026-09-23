@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Actualización FirmEasy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;margin:0;padding:24px}
+.card{background:#fff;max-width:900px;margin:auto;padding:24px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+h1{margin-top:0}
+label{display:block;margin:12px 0 4px;font-weight:600}
+input,textarea,select{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button{background:#0066cc;color:#fff;border:0;padding:10px 16px;border-radius:6px;cursor:pointer}
+button:disabled{background:#9db8d9;cursor:not-allowed}
+button.ghost{background:#fff;color:#0066cc;border:1px solid #0066cc}
+table{width:100%;border-collapse:collapse;margin-top:20px}
+th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;font-size:.9rem}
+th{background:#f8fafc}
+.msg{margin:10px 0;padding:10px;border-radius:6px}
+.msg.ok{background:#e8f5e9;color:#1b5e20}
+.msg.err{background:#fbe9e7;color:#b71c1c}
+.muted{color:#666;font-size:.8rem}
+</style></head>
+<body>
+<div class="card">
+<h1>Gestión de actualizaciones</h1>
+<p class="muted">Los instaladores se suben a Vercel Blob vía <code>/api/upload-release.php</code>.</p>
+<div id="msgBox"></div>
+<form id="uploadForm" enctype="multipart/form-data">
+<div class="grid">
+<div><label>Version (semver)</label><input name="version" required></div>
+<div><label>Version code</label><input name="version_code" type="number" required></div>
+<div><label>Release date</label><input name="release_date" type="datetime-local"></div>
+<div><label>Min supported version</label><input name="min_supported_version"></div>
+</div>
+<label>Instalador</label><input type="file" name="file" required>
+<label>Mandatory</label><select name="mandatory"><option value="0">No</option><option value="1">Sí</option></select>
+<label>Release notes</label><textarea name="release_notes" rows="3"></textarea>
+<label>Signature (base64url)</label><input name="signature">
+<label>Token de subida</label><input name="token" type="password" placeholder="UPLOAD_RELEASE_TOKEN" required>
+<button type="submit">Subir instalador</button>
+</form>
+
+<h2>Versiones publicadas (máx 2)</h2>
+<div style="margin-top:10px"><button class="ghost" id="btnRefresh" type="button">Recargar</button></div>
+<table id="tbl">
+<tr><th>Version</th><th>Code</th><th>Fecha</th><th>Size</th><th>Mandatory</th><th>Download</th></tr>
+<tbody id="tbody"><tr><td colspan="6" class="muted">Cargando…</td></tr></tbody>
+</table>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const msgBox = $('msgBox');
+
+function showMsg(text, ok) {
+  msgBox.innerHTML = '';
+  const d = document.createElement('div');
+  d.className = 'msg ' + (ok ? 'ok' : 'err');
+  d.textContent = text;
+  msgBox.appendChild(d);
+}
+
+function fmt(size) {
+  if (!size && size !== 0) return '-';
+  if (size > 1048576) return (size / 1048576).toFixed(1) + ' MB';
+  if (size > 1024) return Math.round(size / 1024) + ' KB';
+  return size + ' B';
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function loadReleases() {
+  const tb = $('tbody');
+  tb.innerHTML = '<tr><td colspan="6" class="muted">Cargando…</td></tr>';
+  try {
+    const res = await fetch('/api/check-update.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ version_code: 0 })
+    });
+    const data = await res.json();
+    const list = (data && data.all) || [];
+    if (!list.length) {
+      tb.innerHTML = '<tr><td colspan="6" class="muted">No hay versiones publicadas.</td></tr>';
+      return;
+    }
+    tb.innerHTML = list.map(r => `<tr>
+      <td>${esc(r.version)}</td>
+      <td>${esc(r.version_code)}</td>
+      <td>${esc(r.release_date || r.created_at || '')}</td>
+      <td>${fmt(r.size || r.size_bytes)}</td>
+      <td>${r.mandatory ? 'Sí' : 'No'}</td>
+      <td><a href="${esc(r.download_url || ('/api/download-release.php?code=' + r.version_code))}">Descargar</a></td>
+    </tr>`).join('');
+  } catch (e) {
+    tb.innerHTML = '<tr><td colspan="6" class="muted">Error cargando versiones.</td></tr>';
+  }
+}
+
+$('uploadForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const form = ev.target;
+  const btn = form.querySelector('button[type=submit]');
+  const fd = new FormData(form);
+  btn.disabled = true;
+  msgBox.innerHTML = '';
+  try {
+    const res = await fetch('/api/upload-release.php', {
+      method: 'POST',
+      body: fd
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) {
+      showMsg('Instalador subido: ' + (data.version || data.version_code), true);
+      form.reset();
+    } else {
+      showMsg('Error: ' + (data.error || ('HTTP ' + res.status)), false);
+    }
+  } catch (e) {
+    showMsg('Error de red: ' + e.message, false);
+  } finally {
+    btn.disabled = false;
+    loadReleases();
+  }
+});
+
+$('btnRefresh').addEventListener('click', loadReleases);
+loadReleases();
+</script>
+</body>
+</html>

@@ -3,13 +3,11 @@
  * POST /api/auth/submit.php
  * Recibe firma del nonce y valida.
  */
-const AUTH_JOBS_DIR = __DIR__ . '/../../storage/auth_jobs';
-const AUTH_RESP_DIR = __DIR__ . '/../../storage/auth_responses';
-const CERT_DIR = __DIR__ . '/../../storage/auth_certs';
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+require_once __DIR__ . '/../_lib/storage.php';
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['error'=>'Método no permitido']); exit; }
 
@@ -25,12 +23,12 @@ $certificate = $data['certificate'] ?? '';
 if (!$state || !$signature) { http_response_code(400); echo json_encode(['error'=>'state y signature requeridos']); exit; }
 
 // Encontrar job
-$found = null; $jobFile = null;
-foreach (glob(AUTH_JOBS_DIR.'/*.json') as $file) {
-    $job = json_decode(file_get_contents($file), true);
-    if (isset($job['state']) && $job['state'] === $state) {
+$found = null; $jobKey = null;
+foreach (storage_list('auth_jobs/') as $entry) {
+    $job = storage_read_json('auth_jobs/' . basename($entry['pathname']));
+    if (is_array($job) && isset($job['state']) && $job['state'] === $state) {
         $found = $job;
-        $jobFile = $file;
+        $jobKey = 'auth_jobs/' . basename($entry['pathname']);
         break;
     }
 }
@@ -43,8 +41,8 @@ $nonce = base64_decode(strtr($found['nonce'], '-_', '+/'));
 $verification = ['ok'=>false,'error'=>null];
 
 if (!$certificate) {
-    $certFile = CERT_DIR.'/'.$state.'.pem';
-    if (file_exists($certFile)) $certificate = file_get_contents($certFile);
+    $certificate = storage_read('auth_certs/' . $state . '.pem');
+    if ($certificate === false) $certificate = '';
 }
 
 // Intentar verificación CMS
@@ -95,8 +93,7 @@ $result = [
 ];
 
 // Guardar respuesta
-if (!is_dir(AUTH_RESP_DIR)) mkdir(AUTH_RESP_DIR, 0755, true);
-file_put_contents(AUTH_RESP_DIR.'/'.$state.'.json', json_encode($result, JSON_PRETTY_PRINT));
+storage_write_json('auth_responses/' . $state . '.json', $result);
 
 // Callback opcional
 if (!empty($found['callback_url'])) {

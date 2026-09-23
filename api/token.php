@@ -21,6 +21,9 @@
 // Configuración
 const STORAGE_DIR = __DIR__ . '/../storage/jobs';
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
 // CORS
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
@@ -64,19 +67,11 @@ if (!preg_match('/^[a-f0-9-]{36}$/i', $jobId)) {
     exit;
 }
 
-// Leer archivo
-$storageFile = STORAGE_DIR . '/' . $jobId . '.json';
-
-if (!file_exists($storageFile)) {
+// Leer job -- Vercel Blob o disco local
+$content = storage_read('jobs/' . $jobId . '.json');
+if ($content === false) {
     http_response_code(404);
     echo json_encode(['error' => 'Job no encontrado']);
-    exit;
-}
-
-$content = file_get_contents($storageFile);
-if ($content === false) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Error leyendo job']);
     exit;
 }
 

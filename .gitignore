@@ -22,3 +22,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Vercel
+.vercel/
+vendor/

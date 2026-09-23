@@ -36,17 +36,23 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Configuración
-$signedDir = realpath(__DIR__ . '/../document/signed');
-if ($signedDir === false) {
-    $signedDir = __DIR__ . '/../document/signed';
-    if (!is_dir($signedDir)) {
-        mkdir($signedDir, 0755, true);
-    }
-    $signedDir = realpath($signedDir);
-}
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+$useBlob = storage_use_blob();
 
-define('SIGNED_DIR', $signedDir);
+if ($useBlob) {
+    $signedDir = null;
+} else {
+    $signedDir = realpath(__DIR__ . '/../document/signed');
+    if ($signedDir === false) {
+        $signedDir = __DIR__ . '/../document/signed';
+        if (!is_dir($signedDir)) {
+            mkdir($signedDir, 0755, true);
+        }
+        $signedDir = realpath($signedDir);
+    }
+    define('SIGNED_DIR', $signedDir);
+}
 define('MAX_FILE_SIZE', 150 * 1024 * 1024);
 define('MIN_FILE_SIZE', 100);
 
@@ -76,14 +82,11 @@ if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
 }
 
 if (!empty($bearerToken) && !empty($jobId) && preg_match('/^[a-f0-9-]{36}$/i', $jobId)) {
-    $jobFile = __DIR__ . '/../storage/jobs/' . $jobId . '.json';
-    if (file_exists($jobFile)) {
-        $jobData = json_decode(file_get_contents($jobFile), true);
-        if ($jobData && ($jobData['token'] ?? '') !== $bearerToken) {
-            http_response_code(401);
-            echo json_encode(['error' => 'Token inválido.']);
-            exit;
-        }
+    $jobData = storage_read_json('jobs/' . $jobId . '.json');
+    if ($jobData && ($jobData['token'] ?? '') !== $bearerToken) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Token inválido.']);
+        exit;
     }
 }
 
@@ -137,13 +140,10 @@ if (substr($rawBody, 0, 5) !== '%PDF-') {
     exit;
 }
 
-// Construir nombre del archivo firmado
-$baseName = preg_replace('/\.pdf$/i', '', $requestedFile);
+// Guardar el archivo -- Vercel Blob o disco local
+$baseName   = preg_replace('/\.pdf$/i', '', $requestedFile) ?: 'documento';
 $signedFileName = $baseName . '_' . $userId . '.pdf';
-$signedFilePath = SIGNED_DIR . '/' . $signedFileName;
-
-// Guardar el archivo
-$bytesWritten = file_put_contents($signedFilePath, $rawBody);
+$bytesWritten = storage_write('signed/' . $signedFileName, $rawBody, 'application/pdf');
 if ($bytesWritten === false) {
     http_response_code(500);
     echo json_encode(['error' => 'Error al guardar el archivo firmado.']);
@@ -162,9 +162,8 @@ $response = [
 
 // Actualizar estado del documento en el job y enviar callback
 if (!empty($jobId) && !empty($documentCode)) {
-    $jobFile = __DIR__ . '/../storage/jobs/' . $jobId . '.json';
-    if (file_exists($jobFile)) {
-        $jobData = json_decode(file_get_contents($jobFile), true);
+    $jobData = storage_read_json('jobs/' . $jobId . '.json');
+    if ($jobData !== null) {
 
         // Actualizar estado del documento
         foreach ($jobData['documents'] as &$doc) {
@@ -177,7 +176,7 @@ if (!empty($jobId) && !empty($documentCode)) {
         unset($doc);
 
         // Guardar job actualizado
-        file_put_contents($jobFile, json_encode($jobData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        storage_write_json('jobs/' . $jobId . '.json', $jobData);
 
         // Verificar si todos los documentos están procesados
         $allDone = true;

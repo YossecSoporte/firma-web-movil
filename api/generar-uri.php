@@ -46,6 +46,9 @@ const SHA256_CACHE_FILE = __DIR__ . '/../storage/sha256_cache.json';
 const TOKEN_FIJO = 'tkn_ind_yiaLpkwq42LIfgTp1GHhjzifHcjusTzT';
 const EXPIRACION_SEGUNDOS = 600; // 10 minutos
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
 // Base URL del sistema externo
 $BASE_URL_EXTERNO = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://localhost:8081', '/');
 
@@ -203,17 +206,8 @@ if (isset($data['configuration']['batch_error_handling']) && is_array($data['con
 $job = generateUuidV4();
 $exp = time() + EXPIRACION_SEGUNDOS;
 
-// Caché SHA-256 persistente en disco
-$sha256Cache = [];
-if (file_exists(SHA256_CACHE_FILE)) {
-    $raw = file_get_contents(SHA256_CACHE_FILE);
-    if ($raw !== false) {
-        $parsed = json_decode($raw, true);
-        if (is_array($parsed)) {
-            $sha256Cache = $parsed;
-        }
-    }
-}
+// Caché SHA-256 persistente (Blob o disco)
+$sha256Cache = storage_read_json('sha256_cache.json') ?? [];
 $cacheModified = false;
 
 // Validar y procesar cada documento (soporta 1 o más documentos — firma en bloque)
@@ -350,9 +344,8 @@ $jobData = [
     'created_at' => time()
 ];
 
-// Guardar en archivo JSON
-$storageFile = STORAGE_DIR . '/' . $job . '.json';
-if (!file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
+// Guardar en archivo JSON (Vercel Blob o disco local)
+if (storage_write_json('jobs/' . $job . '.json', $jobData) === false) {
     http_response_code(500);
     echo json_encode(['error' => 'Error guardando job en almacenamiento']);
     exit;
@@ -360,11 +353,7 @@ if (!file_put_contents($storageFile, json_encode($jobData, JSON_UNESCAPED_SLASHE
 
 // Guardar caché SHA-256 si hubo cambios
 if ($cacheModified) {
-    file_put_contents(
-        SHA256_CACHE_FILE,
-        json_encode($sha256Cache, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT),
-        LOCK_EX
-    );
+    storage_write_json('sha256_cache.json', $sha256Cache);
 }
 
 // Construir URI plano (sin nonce, sin kid)

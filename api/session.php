@@ -16,6 +16,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 const JOBS_DIR = __DIR__ . '/../storage/jobs';
 const KEYS_DIR = __DIR__ . '/../storage/keys';
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
 $sid = $_GET['sid'] ?? '';
 if (empty($sid)) {
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
@@ -31,14 +34,12 @@ if (empty($sid)) {
 }
 
 $kid = null;
-if (is_dir(JOBS_DIR)) {
-    $files = glob(JOBS_DIR . '*.json');
-    foreach ($files as $file) {
-        $jobData = json_decode(file_get_contents($file), true);
-        if (!empty($jobData['token']) && $jobData['token'] === $sid) {
-            $kid = $jobData['kid'] ?? null;
-            break;
-        }
+// Buscar el job cuyo token coincida con el sid (Vercel Blob: listado con prefijo jobs/)
+foreach (storage_list('jobs/') as $entry) {
+    $jobData = storage_read_json('jobs/' . basename($entry['pathname']));
+    if (!empty($jobData['token']) && $jobData['token'] === $sid) {
+        $kid = $jobData['kid'] ?? null;
+        break;
     }
 }
 
@@ -46,12 +47,8 @@ if (empty($kid)) {
     $kid = 'default';
 }
 
-$keyFile = KEYS_DIR . '/' . $kid . '.json';
-$publicKey = '';
-if (file_exists($keyFile)) {
-    $keyData = json_decode(file_get_contents($keyFile), true);
-    $publicKey = $keyData['public_key'] ?? '';
-}
+$keyData = storage_read_json('keys/' . $kid . '.json');
+$publicKey = $keyData['public_key'] ?? '';
 
 $sessionId = sprintf(
     '%08x-%04x-%04x-%04x-%012x',

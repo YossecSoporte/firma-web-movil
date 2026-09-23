@@ -3,22 +3,21 @@
  * GET /api/auth/challenge.php?state=...
  * Devuelve nonce fresco para autenticación.
  */
-const AUTH_JOBS_DIR = __DIR__ . '/../../storage/auth_jobs';
-const EXPIRACION_SEGUNDOS = 600;
 
 header('Access-Control-Allow-Origin: *');
 header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__ . '/../_lib/storage.php';
 
 $state = $_GET['state'] ?? '';
 if (!$state) { http_response_code(400); echo json_encode(['error'=>'state requerido']); exit; }
 
 // Encontrar job por state
-$found = null;
-foreach (glob(AUTH_JOBS_DIR.'/*.json') as $file) {
-    $job = json_decode(file_get_contents($file), true);
-    if (isset($job['state']) && $job['state'] === $state) {
+$found = null; $jobKey = null;
+foreach (storage_list('auth_jobs/') as $entry) {
+    $job = storage_read_json('auth_jobs/' . basename($entry['pathname']));
+    if (is_array($job) && isset($job['state']) && $job['state'] === $state) {
         $found = $job;
-        $jobFile = $file;
+        $jobKey = 'auth_jobs/' . basename($entry['pathname']);
         break;
     }
 }
@@ -30,7 +29,7 @@ if (time() > $found['exp']) { http_response_code(410); echo json_encode(['error'
 if (empty($found['nonce'])) {
     $found['nonce'] = base64url_encode(random_bytes(32));
     $found['nonce_created_at'] = time();
-    file_put_contents($jobFile, json_encode($found, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+    storage_write_json($jobKey, $found);
 }
 
 echo json_encode([

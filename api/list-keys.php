@@ -9,14 +9,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 const KEYS_DIR = __DIR__ . '/../storage/keys';
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
 $keys = [];
-if (is_dir(KEYS_DIR)) {
-    $files = glob(KEYS_DIR . '/*.json');
-    foreach ($files as $file) {
-        $data = json_decode(file_get_contents($file), true);
-        if (!empty($data['kid'])) {
-            $keys[] = $data;
-        }
+foreach (storage_list('keys/') as $entry) {
+    $data = storage_read_json('keys/' . basename($entry['pathname']));
+    if (!empty($data['kid'])) {
+        $keys[] = $data;
     }
 }
 

@@ -22,6 +22,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
     exit;
 }
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
+if (storage_use_blob()) {
+    $deleted = storage_delete_prefix('signed/');
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => true,
+        'deleted' => $deleted
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $signedDir = realpath(__DIR__ . '/../document/signed');
 if ($signedDir === false) {
     header('Content-Type: application/json; charset=utf-8');

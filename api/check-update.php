@@ -1,13 +1,12 @@
 <?php
 header('Access-Control-Allow-Origin: *');
 header('Content-Type: application/json');
-$base = dirname(__DIR__);
-$manifestDir = $base.'/storage/releases/manifests';
-$files = glob($manifestDir.'/*.json');
+require_once __DIR__.'/_lib/storage.php';
 $releases = [];
-foreach($files as $f){
-  $j = json_decode(file_get_contents($f), true);
-  if($j) $releases[] = $j;
+foreach (storage_list('releases/manifests/') as $entry) {
+  if (!str_ends_with($entry['pathname'], '.json')) continue;
+  $j = storage_read_json('releases/manifests/' . basename($entry['pathname']));
+  if ($j) $releases[] = $j;
 }
 usort($releases, fn($a,$b)=> ($b['version_code'] ?? 0) <=> ($a['version_code'] ?? 0));
 $input = json_decode(file_get_contents('php://input'), true);

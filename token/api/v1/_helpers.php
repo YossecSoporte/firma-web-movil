@@ -8,6 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__ . '/../../../api/_lib/storage.php';
 
 define('FIRMEASY_BASE', 'https://enterprise.digital.firmeasy.legal/api/v1');
 define('FIRMEASY_API_KEY', getenv('FIRMEASY_API_KEY') ?: 'sk_live_DvkVAvtOjMc4604AzWM8kruHtu9V4RjN');
@@ -87,9 +88,8 @@ function proxyPostInjectKey($path, $body = '', $bearerToken = '') {
     $nameCode = '';
     $keyPublic = '';
 
-    $keyFile = $keysDir . '/' . $kid . '.json';
-    if (file_exists($keyFile)) {
-        $keyData = json_decode(file_get_contents($keyFile), true);
+    $keyData = storage_read_json('keys/' . $kid . '.json');
+    if ($keyData !== null) {
         $nameCode = $keyData['kid'] ?? '';
         $keyPublic = $keyData['public_key'] ?? '';
     }

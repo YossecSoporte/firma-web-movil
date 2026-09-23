@@ -1,0 +1,177 @@
+{
+  "functions": {
+    "api/generar-uri.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 30,
+      "includeFiles": "document/**"
+    },
+    "api/generar-uri-x25519.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 30,
+      "includeFiles": "document/**"
+    },
+    "api/job.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/token.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/generar-job.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/upload-signed.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 30
+    },
+    "api/download.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15,
+      "includeFiles": "document/**"
+    },
+    "api/download-fail.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/download-signed.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
+    },
+    "api/list-pdfs.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10,
+      "includeFiles": "document/**"
+    },
+    "api/list-signed.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/clear-signed.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/list-keys.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/register-key.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/delete-key.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/session.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/generar-auth.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/auth/callback.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/auth/challenge.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/auth/submit.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
+    },
+    "api/auth/check-verify.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/auth/upload-cert.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/callback.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/list-callbacks.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/resend-callback.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
+    },
+    "api/export-csv.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15,
+      "includeFiles": "document/**"
+    },
+    "api/check-update.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "api/download-release.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
+    },
+    "api/upload-release.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 30
+    },
+    "api/populate-sha256-cache.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15,
+      "includeFiles": "document/**"
+    },
+    "api/batch-token.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
+    },
+    "api/upload-signed-fail.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 10
+    },
+    "token/api/v1/auth/token.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
+    },
+    "token/api/v1/meter/tick.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
+    },
+    "token/api/v1/session/start.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
+    },
+    "token/api/v1/session/close.php": {
+      "runtime": "vercel-php@0.7.4",
+      "maxDuration": 15
+    }
+  },
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/latam", "destination": "/latam.html" },
+    { "source": "/integracion", "destination": "/integracion.html" },
+    { "source": "/autentificacion", "destination": "/autentificacion.html" },
+    { "source": "/callbacks", "destination": "/callbacks.html" },
+    { "source": "/keys", "destination": "/keys.html" },
+    { "source": "/pesados", "destination": "/pesados.html" },
+    { "source": "/actualizacion", "destination": "/actualizacion.html" },
+    { "source": "/app-no-instalada", "destination": "/app-no-instalada.html" },
+    { "source": "/api/job/([^/]+)", "destination": "/api/job.php?job=$1" },
+    { "source": "/api/token/([^/]+)", "destination": "/api/token.php?job=$1" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS, DELETE" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-Job-Id, X-API-KEY" }
+      ]
+    }
+  ]
+}

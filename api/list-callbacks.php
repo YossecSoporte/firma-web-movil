@@ -8,8 +8,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+$useBlob = storage_use_blob();
+
 $callbackDir = realpath(__DIR__ . '/../storage/callbacks');
-if ($callbackDir === false) {
+if ($callbackDir === false && !$useBlob) {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => true, 'callbacks' => []]);
     exit;
@@ -20,21 +24,22 @@ $jobFilter = $_GET['job'] ?? '';
 // GET summaries
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $summaries = [];
-    $files = glob($callbackDir . '/*_summary.json');
+    $entries = storage_list('callbacks/');
 
-    foreach ($files as $file) {
-        $content = file_get_contents($file);
-        $summary = json_decode($content, true);
+    foreach ($entries as $entry) {
+        $base = basename($entry['pathname']);
+        if (!str_ends_with($base, '_summary.json')) continue;
+
+        $summary = storage_read_json('callbacks/' . $base);
         if (!$summary) continue;
 
         if (!empty($jobFilter) && ($summary['job'] ?? '') !== $jobFilter) continue;
 
         // Get job info if available
         $jobId = $summary['job'] ?? '';
-        $jobFile = $callbackDir . '/../jobs/' . $jobId . '.json';
         $jobInfo = null;
-        if (file_exists($jobFile)) {
-            $jd = json_decode(file_get_contents($jobFile), true);
+        $jd = storage_read_json('jobs/' . $jobId . '.json');
+        if ($jd !== null) {
             $jobInfo = [
                 'token' => $jd['token'] ?? '',
                 'callback_url' => $jd['callback'] ?? '',
@@ -44,8 +49,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         }
 
         // Count individual log files for this job
-        $logFiles = glob($callbackDir . '/' . $jobId . '_*.json');
-        $logCount = count($logFiles) - 1; // minus the summary file itself
+        $logCount = 0;
+        foreach ($entries as $e2) {
+            $b2 = basename($e2['pathname']);
+            if ($b2 === $base) continue;
+            if (str_starts_with($b2, $jobId . '_')) $logCount++;
+        }
 
         $summaries[] = [
             'job' => $jobId,
@@ -72,11 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 // DELETE — limpiar todos los callbacks
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-    $files = glob($callbackDir . '/*.json');
-    $deleted = 0;
-    foreach ($files as $file) {
-        if (unlink($file)) $deleted++;
-    }
+    $deleted = storage_delete_prefix('callbacks/');
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => true, 'deleted' => $deleted]);
     exit;

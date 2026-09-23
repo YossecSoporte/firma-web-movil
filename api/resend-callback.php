@@ -9,6 +9,10 @@
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
@@ -30,14 +34,12 @@ if (empty($jobId) || !preg_match('/^[a-f0-9-]{36}$/i', $jobId)) {
     exit;
 }
 
-$jobFile = __DIR__ . '/../storage/jobs/' . $jobId . '.json';
-if (!file_exists($jobFile)) {
+$jobData = storage_read_json('jobs/' . $jobId . '.json');
+if ($jobData === null) {
     http_response_code(404);
     echo json_encode(['error' => 'Job no encontrado']);
     exit;
 }
-
-$jobData = json_decode(file_get_contents($jobFile), true);
 if (empty($jobData['callback'])) {
     http_response_code(400);
     echo json_encode(['error' => 'Este job no tiene callback configurado']);

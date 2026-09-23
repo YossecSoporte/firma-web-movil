@@ -36,6 +36,9 @@
  *   { "received": false, "job": "uuid" }
  */
 
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
 // CORS
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -55,12 +58,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    $summaryFile = __DIR__ . '/../storage/callbacks/' . $jobId . '_summary.json';
+    $summary = storage_read_json('callbacks/' . $jobId . '_summary.json');
 
     header('Content-Type: application/json; charset=utf-8');
 
-    if (file_exists($summaryFile)) {
-        $summary = json_decode(file_get_contents($summaryFile), true);
+    if ($summary !== null) {
         echo json_encode([
             'received' => true,
             'job' => $summary['job'] ?? $jobId,
@@ -119,24 +121,18 @@ if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
     $bearerToken = $m[1];
 }
 
-$jobFile = __DIR__ . '/../storage/jobs/' . $jobId . '.json';
-if (file_exists($jobFile)) {
-    $jobData = json_decode(file_get_contents($jobFile), true);
-    if (!empty($bearerToken) && $jobData && ($jobData['token'] ?? '') !== $bearerToken) {
+$jobData = storage_read_json('jobs/' . $jobId . '.json');
+if ($jobData !== null) {
+    if (!empty($bearerToken) && ($jobData['token'] ?? '') !== $bearerToken) {
         http_response_code(401);
         echo json_encode(['error' => 'Token inválido']);
         exit;
     }
 }
 
-// Guardar log individual
-$logDir = __DIR__ . '/../storage/callbacks';
-if (!is_dir($logDir)) {
-    mkdir($logDir, 0755, true);
-}
-
+// Guardar log individual (Vercel Blob / disco)
 $timestamp = date('Y-m-d_H-i-s');
-$logFile = $logDir . '/' . $jobId . '_' . $timestamp . '.json';
+$logFile = 'callbacks/' . $jobId . '_' . $timestamp . '.json';
 
 $logEntry = [
     'received_at' => date('c'),
@@ -149,15 +145,10 @@ $logEntry = [
     'raw' => $payload
 ];
 
-file_put_contents($logFile, json_encode($logEntry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+storage_write_json($logFile, $logEntry);
 
 // Guardar resumen consolidado por job
-$summaryFile = $logDir . '/' . $jobId . '_summary.json';
-$summary = [];
-if (file_exists($summaryFile)) {
-    $summary = json_decode(file_get_contents($summaryFile), true) ?: [];
-}
-
+$summary = storage_read_json('callbacks/' . $jobId . '_summary.json') ?? [];
 $summary['job'] = $jobId;
 $summary['last_callback_at'] = date('c');
 $summary['success'] = (bool) $success;
@@ -175,7 +166,7 @@ $summary['callbacks'][] = [
     'data' => $data
 ];
 
-file_put_contents($summaryFile, json_encode($summary, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+storage_write_json('callbacks/' . $jobId . '_summary.json', $summary);
 
 // Respuesta
 header('Content-Type: application/json; charset=utf-8');

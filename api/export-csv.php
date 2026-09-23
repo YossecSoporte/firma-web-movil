@@ -31,7 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$BASE_URL = 'http://localhost:8081';
+// Capa de almacenamiento auto-detect (Vercel Blob / disco)
+require_once __DIR__ . '/_lib/storage.php';
+
+$BASE_URL = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://localhost:8081', '/');
 $DOC_DIR  = __DIR__ . '/../document';
 $SIGNED_DIR = $DOC_DIR . '/signed';
 
@@ -57,7 +60,7 @@ $filesParam = $_GET['files'] ?? '';
 $filesList = !empty($filesParam) ? array_map('trim', explode(',', $filesParam)) : [];
 
 // Archivos excluidos de la generación
-$excluded = ['test.pdf', 'pdf_horizontal.pdf'];
+$excluded = [];
 
 // Obtener PDFs originales
 $files = glob($DOC_DIR . '/*.pdf');
@@ -69,7 +72,13 @@ if ($files === false || count($files) === 0) {
 
 // Obtener PDFs firmados (para marcar estado)
 $signedMap = [];
-if (is_dir($SIGNED_DIR)) {
+if (storage_use_blob()) {
+    foreach (storage_list('signed/') as $entry) {
+        $base = preg_replace('/\.pdf$/i', '', basename($entry['pathname']));
+        $original = preg_replace('/_[^_]+$/', '', $base);
+        $signedMap[$original] = basename($entry['pathname']);
+    }
+} elseif (is_dir($SIGNED_DIR)) {
     $signedFiles = glob($SIGNED_DIR . '/*.pdf');
     if ($signedFiles) {
         foreach ($signedFiles as $sf) {
