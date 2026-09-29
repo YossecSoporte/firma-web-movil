@@ -36,7 +36,8 @@ function _blobStoreId(): string {
         return preg_replace('/^store_/', '', trim($id));
     }
     $rw = _blobRwToken();
-    if ($rw !== '' && preg_match('/^vercel_blob_([a-z0-9]+)_/', $rw, $m)) {
+    // Formato real del token: vercel_blob_rw_<storeId>_<secreto>
+    if ($rw !== '' && preg_match('/^vercel_blob_rw_(.+?)_/', $rw, $m)) {
         return $m[1];
     }
     throw new Exception('No se pudo determinar el store id de Vercel Blob');

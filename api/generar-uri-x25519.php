@@ -46,11 +46,52 @@ require_once __DIR__ . '/_lib/storage.php';
 // Base URL del sistema externo (fija = IP del host a la que llega el celular por USB tethering)
 $BASE_URL_EXTERNO = rtrim(getenv('BASE_URL_EXTERNO') ?: 'http://localhost:8081', '/');
 
-// Cargar par de claves estático de FirmEasy (server) — Vercel Blob o disco
-$firmeasyKeys = storage_read_json('firmeasy_keys.json');
+// Cargar un archivo JSON de configuracion con fallback:
+// 1) capa de storage (Vercel Blob / disco)
+// 2) archivo incluido en el bundle de la funcion (includeFiles)
+// 3) variable de entorno con el JSON completo
+function loadJsonWithFallback(string $virtual, string $bundleRelPath, ?string $envName = null): ?array
+{
+    $data = storage_read_json($virtual);
+    if (is_array($data)) {
+        return $data;
+    }
+
+    $bundlePath = __DIR__ . '/../' . ltrim($bundleRelPath, '/');
+    if (is_file($bundlePath)) {
+        $raw = file_get_contents($bundlePath);
+        if ($raw !== false) {
+            $parsed = json_decode($raw, true);
+            if (is_array($parsed)) {
+                return $parsed;
+            }
+        }
+    }
+
+    if ($envName !== null) {
+        $env = getenv($envName);
+        if (!empty($env)) {
+            $parsed = json_decode($env, true);
+            if (is_array($parsed)) {
+                return $parsed;
+            }
+        }
+    }
+
+    return null;
+}
+
+// Cargar par de claves estatico de FirmEasy (server) — Blob, bundle o env
+$firmeasyKeys = loadJsonWithFallback('firmeasy_keys.json', 'storage/firmeasy_keys.json', 'FIRMEASY_KEYS_JSON');
+if ($firmeasyKeys === null && getenv('FIRMEASY_SECRET_KEY') && getenv('FIRMEASY_PUBLIC_KEY')) {
+    $firmeasyKeys = [
+        'secret_key' => getenv('FIRMEASY_SECRET_KEY'),
+        'public_key' => getenv('FIRMEASY_PUBLIC_KEY'),
+    ];
+}
 if ($firmeasyKeys === null) {
     http_response_code(500);
-    echo json_encode(['error' => 'No existe storage/firmeasy_keys.json. Ejecuta gen_keys una vez.']);
+    echo json_encode(['error' => 'No se encontro la clave del servidor (firmeasy_keys.json) en Blob ni en el bundle.']);
     exit;
 }
 if (empty($firmeasyKeys['secret_key']) || empty($firmeasyKeys['public_key'])) {
@@ -99,8 +140,8 @@ if (!isset($data['configuration']) || !isset($data['documents']) || !is_array($d
 $kid = $data['kid'] ?? DEFAULT_KID;
 $kid = preg_replace('/[^a-zA-Z0-9_-]/', '', $kid);
 
-// Cargar pública de la empresa/cliente — Vercel Blob o disco
-$empresaKeyData = storage_read_json('keys/' . $kid . '.json');
+// Cargar pública de la empresa/cliente — Blob, bundle o disco
+$empresaKeyData = loadJsonWithFallback('keys/' . $kid . '.json', 'storage/keys/' . $kid . '.json');
 if ($empresaKeyData === null) {
     http_response_code(400);
     echo json_encode(['error' => "No se encontró clave registrada para kid: $kid. Registra la pública con POST /api/register-key.php"]);
