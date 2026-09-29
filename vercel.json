@@ -1,7 +1,7 @@
 {
   "functions": {
-    "api/generar-uri-x25519.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 30, "includeFiles": "document/**,storage/firmeasy_keys.json,storage/keys/**,storage/jobs/**"},
-    "api/job.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 10, "includeFiles": "storage/jobs/**"},
+    "api/generar-uri-x25519.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 30, "includeFiles": "document/**,storage/**"},
+    "api/job.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 10, "includeFiles": "storage/**"},
     "api/upload-signed.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 30, "includeFiles": "storage/jobs/**"},
     "api/list-signed.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 10},
     "api/download-signed.php": {"runtime": "vercel-php@0.7.4", "maxDuration": 15},
