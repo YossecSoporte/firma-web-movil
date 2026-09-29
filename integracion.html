@@ -353,9 +353,8 @@
 
       // ===== WHITELIST: solo los 11 PDFs actuales en la página /integracion =====
       const PDF_WHITELIST = [
-        'doc_prueba1.pdf', 'doc_prueba2.pdf', 'doc_prueba3.pdf', 'doc_prueba4.pdf', 'doc_prueba5.pdf',
-        'doc_prueba7.pdf', 'doc_prueba9.pdf', 'manifiesto-1.pdf', 'manifiesto-2.pdf', 'manifiesto-3.pdf',
-        'manifiesto-11.pdf'
+        'prueba_1.pdf', 'prueba_2.pdf', 'prueba_3.pdf', 'prueba_4.pdf', 'prueba_5.pdf',
+        'prueba_6.pdf', 'prueba_7.pdf', 'prueba_8.pdf', 'prueba_9.pdf', 'prueba_10.pdf'
       ];
 
       // ===== Deep link X25519: firmeasy://integration?data=<BLOB>&sid=<TOKEN> =====
